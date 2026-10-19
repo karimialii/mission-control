@@ -1,0 +1,9 @@
+# Agent tool and OS artifacts (may contain local paths)
+.claude-flow/
+.swarm/
+.hive-mind/
+.DS_Store
+__pycache__/
+*.pyc
+# Mission state from running the skill on itself
+.mission/

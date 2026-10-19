@@ -1,0 +1,223 @@
+{
+  "claude": {
+    "label": "Claude Code",
+    "role": "executor",
+    "model": "haiku",
+    "models": [
+      "claude-haiku-5-5",
+      "claude-sonnet-5-5",
+      "claude-opus-5-5",
+      "claude-fable-5-1",
+      "claude-haiku-4-5",
+      "haiku",
+      "sonnet",
+      "opus"
+    ],
+    "parser": "claude",
+    "timeout": 3600,
+    "model_args": [
+      "--model",
+      "{model}"
+    ],
+    "cmd": [
+      "claude",
+      "-p",
+      "{prompt}",
+      "{model_args}",
+      "{effort_args}",
+      "{budget_args}",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--no-session-persistence",
+      "--strict-mcp-config",
+      "--disable-slash-commands",
+      "--permission-mode",
+      "acceptEdits",
+      "--disallowedTools",
+      "Bash(python3 -m pip*),Bash(pip *),Bash(npm install*)",
+      "--allowedTools",
+      "Read,Edit,Write,Glob,Grep,Bash(ls *),Bash(cat *),Bash(git status*),Bash(git diff*),Bash(npm test*),Bash(npm run test*),Bash(npm run build*),Bash(pytest*),Bash(python3 -m *),Bash(npm run *)"
+    ],
+    "model_price": {
+      "claude-haiku-5-5": 0.1,
+      "haiku": 0.1,
+      "claude-haiku-4-5": 1.0,
+      "claude-sonnet-5-5": 2.0,
+      "claude-sonnet-5": 2.0,
+      "sonnet": 2.0,
+      "claude-opus-5-5": 4.0,
+      "opus": 4.0,
+      "claude-opus-5": 5.0,
+      "claude-opus-4-8": 5.0,
+      "claude-fable-5-1": 10.0,
+      "claude-fable-5": 10.0,
+      "fable": 10.0
+    },
+    "efforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "effort_args": [
+      "--effort",
+      "{effort}"
+    ],
+    "budget_args": [
+      "--max-budget-usd",
+      "{budget}"
+    ]
+  },
+  "codex": {
+    "label": "Codex CLI (untested template)",
+    "role": "executor",
+    "model": "",
+    "models": [],
+    "parser": "codex",
+    "timeout": 3600,
+    "model_args": [
+      "-m",
+      "{model}"
+    ],
+    "cmd": [
+      "codex",
+      "exec",
+      "--json",
+      "--full-auto",
+      "{model_args}",
+      "{prompt}"
+    ]
+  },
+  "gemini": {
+    "label": "Gemini CLI (untested template)",
+    "role": "executor",
+    "model": "",
+    "models": [],
+    "parser": "gemini",
+    "timeout": 3600,
+    "model_args": [
+      "-m",
+      "{model}"
+    ],
+    "cmd": [
+      "gemini",
+      "{model_args}",
+      "-p",
+      "{prompt}",
+      "--output-format",
+      "json"
+    ]
+  },
+  "simulator": {
+    "label": "Simulator (demo, no tokens)",
+    "role": "executor",
+    "model": "fake",
+    "models": [
+      "fake"
+    ],
+    "parser": "claude",
+    "timeout": 600,
+    "cmd": [
+      "{python}",
+      "{mc}",
+      "_demo",
+      "{task}"
+    ]
+  },
+  "claude-supervisor": {
+    "label": "Claude Code",
+    "role": "supervisor",
+    "model": "opus",
+    "models": [
+      "claude-opus-5-5",
+      "claude-fable-5-1",
+      "claude-sonnet-5-5",
+      "claude-haiku-5-5",
+      "opus",
+      "sonnet",
+      "fable"
+    ],
+    "parser": "claude",
+    "resume": true,
+    "timeout": 1800,
+    "model_args": [
+      "--model",
+      "{model}"
+    ],
+    "cmd": [
+      "claude",
+      "-p",
+      "{prompt}",
+      "{model_args}",
+      "{effort_args}",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--strict-mcp-config",
+      "--disable-slash-commands",
+      "--append-system-prompt",
+      "{system}",
+      "--permission-mode",
+      "acceptEdits",
+      "--disallowedTools",
+      "Bash(python3 -m pip*),Bash(pip *),Bash(npm install*)",
+      "--allowedTools",
+      "Read,Edit,Write,Glob,Grep,Bash(mc *),Bash(ls *),Bash(cat *),Bash(git status*),Bash(git diff*),Bash(git log*),Bash(npm test*),Bash(npm run test*),Bash(npm run build*),Bash(pytest*),Bash(python3 -m *),Bash(npm run *)"
+    ],
+    "efforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "effort_args": [
+      "--effort",
+      "{effort}"
+    ]
+  },
+  "codex-supervisor": {
+    "label": "Codex CLI (untested template)",
+    "role": "supervisor",
+    "model": "",
+    "models": [],
+    "parser": "codex",
+    "resume": false,
+    "timeout": 1800,
+    "model_args": [
+      "-m",
+      "{model}"
+    ],
+    "cmd": [
+      "codex",
+      "exec",
+      "--json",
+      "--full-auto",
+      "{model_args}",
+      "{prompt}"
+    ]
+  },
+  "gemini-supervisor": {
+    "label": "Gemini CLI (untested template)",
+    "role": "supervisor",
+    "model": "",
+    "models": [],
+    "parser": "gemini",
+    "resume": false,
+    "timeout": 1800,
+    "model_args": [
+      "-m",
+      "{model}"
+    ],
+    "cmd": [
+      "gemini",
+      "{model_args}",
+      "-p",
+      "{prompt}",
+      "--output-format",
+      "json"
+    ]
+  }
+}

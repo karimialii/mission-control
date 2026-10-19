@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Mission Control: supervise AI executors across your projects.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Cdefs%3E%3ClinearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%235ac8fa%22/%3E%3Cstop offset=%221%22 stop-color=%22%235856d6%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22url(%23g)%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%227%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.5%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%222.5%22 fill=%22white%22/%3E%3C/svg%3E">
+<title>Mission Control</title>
+<style>
+:root{
+  color-scheme: light dark;
+  --bg:#f5f5f7; --side:rgba(236,236,240,.78); --panel:#ffffff; --panel2:#f2f2f5; --fill:rgba(118,118,128,.12); --fill2:rgba(118,118,128,.08);
+  --line:rgba(0,0,0,.07); --line2:rgba(0,0,0,.13);
+  --text:#1d1d1f; --mute:#6e6e73; --dim:#a1a1a6;
+  --blue:#007aff; --green:#34c759; --orange:#ff9500; --red:#ff3b30; --pink:#ff2d55; --purple:#af52de; --indigo:#5856d6; --teal:#30b0c7;
+  --s-todo:#8e8e93; --s-running:var(--blue); --s-review:var(--purple); --s-needs_changes:var(--orange);
+  --s-blocked:var(--pink); --s-done:var(--green); --s-cancelled:#c7c7cc; --crit:var(--red);
+  /* legacy names used in markup */
+  --cyan:var(--blue); --violet:var(--purple); --magenta:var(--pink); --lime:var(--green); --amber:var(--orange);
+  --ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro",system-ui,"Helvetica Neue",sans-serif;
+  --display:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro",system-ui,"Helvetica Neue",sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;
+  --r:14px; --shadow:0 1px 2px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.05);
+  --ease:cubic-bezier(.32,.72,0,1);
+  --z-side:5; --z-tool:6; --z-scrim:20; --z-drawer:21; --z-toast:40;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#161618; --side:rgba(32,32,36,.72); --panel:#1f1f22; --panel2:#2a2a2e; --fill:rgba(118,118,128,.24); --fill2:rgba(118,118,128,.14);
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
+  --text:#f5f5f7; --mute:#98989d; --dim:#636366;
+  --blue:#0a84ff; --green:#30d158; --orange:#ff9f0a; --red:#ff453a; --pink:#ff375f; --purple:#bf5af2; --indigo:#5e5ce6; --teal:#40c8e0;
+  --s-cancelled:#48484a; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.47 var(--ui);letter-spacing:-.006em;overflow:hidden;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button,select,textarea,input{font:inherit;color:inherit}
+a{color:var(--blue);text-decoration:none}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--blue) 45%,transparent);outline-offset:2px;border-radius:8px}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:var(--fill);border-radius:10px;border:3px solid transparent;background-clip:content-box}::-webkit-scrollbar-track{background:transparent}
+
+.app{display:grid;grid-template-columns:240px 1fr;height:100dvh}
+/* sidebar */
+.sidebar{background:var(--side);backdrop-filter:saturate(180%) blur(30px);-webkit-backdrop-filter:saturate(180%) blur(30px);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 10px 12px;gap:2px;overflow:auto;z-index:var(--z-side)}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 10px 16px}
+.brand .icon{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(160deg,#5ac8fa,#007aff 55%,#5856d6);box-shadow:0 1px 3px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.35)}
+.brand .icon svg{width:18px;height:18px;color:#fff}
+.brand b{font:600 15px var(--display);letter-spacing:-.01em}
+.side-sec{font:600 11px var(--ui);color:var(--mute);padding:14px 10px 4px}
+#nav{display:flex;flex-direction:column;gap:1px}
+#nav button,.pitem{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;cursor:pointer;padding:6px 10px;border-radius:8px;text-align:left;color:var(--text);font-size:13.5px;transition:background .15s}
+#nav button svg{width:18px;height:18px;color:var(--blue);flex:none}
+#nav button:hover,.pitem:hover{background:var(--fill2)}
+#nav button.active,.pitem.active{background:var(--fill)}
+#nav button span{flex:1}
+#nav .badge,.pitem .badge{min-width:18px;height:18px;padding:0 6px;border-radius:9px;background:var(--red);color:#fff;font:600 11px var(--ui);display:grid;place-items:center}
+.pwrap{position:relative}
+.pwrap .pitem{padding-right:30px}
+.premove-s{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:20px;height:20px;border:0;border-radius:50%;background:none;color:var(--mute);cursor:pointer;font-size:15px;line-height:1;display:grid;place-items:center;opacity:0;transition:opacity .15s,background .15s}
+.pwrap:hover .premove-s,.premove-s:focus-visible{opacity:1}
+.premove-s:hover{background:var(--fill);color:var(--red)}
+.pwrap:hover .pct,.pwrap:hover .badge{opacity:0}
+.premove{margin-top:12px;color:var(--mute);background:none}
+.premove:hover{color:var(--red);background:var(--fill2)}
+.pitem .dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--s-todo)}
+.pitem .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pitem .pct{font-size:12px;color:var(--mute)}
+.side-add{margin-top:auto;color:var(--blue) !important}
+/* content column */
+.content{display:flex;flex-direction:column;min-width:0;height:100dvh}
+.toolbar{display:flex;align-items:center;gap:12px;padding:12px 28px;min-height:60px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);z-index:var(--z-tool)}
+.tb-title{min-width:0;display:flex;flex-direction:column}
+.tb-title h2{margin:0;font:600 15px var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-title small{color:var(--mute);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
+.proj-select{display:none}
+.hstats{display:flex;gap:18px;margin-left:auto;align-items:center}
+.chip{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2}
+.chip small{font-size:11px;color:var(--mute)}
+.chip span{font:600 15px var(--display)}
+.supchip span{display:flex;align-items:center;gap:6px}
+.supchip .dot{width:7px;height:7px;border-radius:50%;background:var(--dim)}
+.supchip.live .dot{background:var(--blue);animation:breathe 1.4s ease-in-out infinite}
+.toggle{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:13px}
+.toggle small{font-size:13px;color:var(--text)}
+.sw{width:38px;height:23px;border-radius:12px;background:var(--fill);position:relative;transition:background .25s var(--ease)}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2),0 0 1px rgba(0,0,0,.2);transition:transform .25s var(--ease)}
+.toggle.on .sw{background:var(--green)}
+.toggle.on .sw::after{transform:translateX(15px)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;background:var(--fill2);color:var(--text);padding:7px 14px;border-radius:980px;cursor:pointer;font-size:13px;font-weight:500;transition:background .15s,transform .1s,opacity .15s;white-space:nowrap}
+.btn:hover{background:var(--fill)}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.38;cursor:default;transform:none}
+.btn.primary{background:var(--blue);color:#fff}
+.btn.primary:hover{background:color-mix(in srgb,var(--blue) 88%,#000)}
+.btn.danger{color:var(--red)}
+.btn.sm{padding:5px 11px;font-size:12px}
+
+main{flex:1;overflow:auto;scroll-behavior:smooth}
+.wrap{max-width:1280px;margin:0 auto;padding:26px 32px 64px}
+.view-title{display:flex;align-items:flex-end;gap:16px;margin:0 0 20px;flex-wrap:wrap}
+.view-title > div:first-child{flex:1;min-width:240px}
+.view-title h1{font:700 30px/1.15 var(--display);letter-spacing:-.022em;margin:0}
+.view-title p{margin:4px 0 0;color:var(--mute);font-size:14px;max-width:68ch;text-wrap:pretty}
+.panel{background:var(--panel);border-radius:var(--r);box-shadow:var(--shadow);position:relative}
+.label{font:600 12px var(--ui);color:var(--mute)}
+.mono{font-family:var(--mono);font-size:.94em}
+.muted{color:var(--mute)}
+.empty{padding:48px 24px;text-align:center;color:var(--mute);background:var(--panel);border-radius:var(--r);box-shadow:var(--shadow)}
+.empty code{font-family:var(--mono);color:var(--text)}
+.status{display:inline-flex;align-items:center;gap:6px;font:500 12px var(--ui);padding:2px 9px 2px 8px;border-radius:980px;background:color-mix(in srgb,currentColor 13%,transparent);white-space:nowrap}
+.status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.status.running::before{animation:breathe 1.4s ease-in-out infinite}
+.tag{font:500 11.5px var(--ui);padding:2px 8px;border-radius:6px;background:var(--fill2);color:var(--mute);white-space:nowrap}
+.bar{height:4px;border-radius:4px;background:var(--fill);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:4px;background:var(--blue);transition:width .6s var(--ease)}
+@keyframes breathe{50%{opacity:.35}}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.wrap > *{animation:rise .35s var(--ease) both}
+
+/* overview */
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.pcard{padding:20px;cursor:pointer;transition:transform .2s var(--ease),box-shadow .2s}
+.pcard:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(0,0,0,.05),0 12px 32px rgba(0,0,0,.08)}
+.pcard.current{box-shadow:0 0 0 2px var(--blue),var(--shadow)}
+.pcard h3{margin:0 0 4px;font:600 17px var(--display);letter-spacing:-.01em}
+.pcard .goal{color:var(--mute);font-size:13px;min-height:38px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pcard .row{display:flex;align-items:center;gap:18px;margin-top:14px}
+.ring{position:relative;width:74px;height:74px;flex:none}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font:600 16px var(--display)}
+.mini-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 14px;flex:1}
+.mini-stats div{display:flex;flex-direction:column}
+.mini-stats small{font-size:11px;color:var(--mute)}
+.mini-stats span{font:600 15px var(--display)}
+.needs{position:absolute;top:18px;right:18px;font:600 11px var(--ui);color:#fff;background:var(--red);padding:3px 9px;border-radius:980px}
+.addcard{cursor:default;background:transparent;box-shadow:none;border:1.5px dashed var(--line2)}
+.addcard:hover{transform:none;box-shadow:none}
+.pcard .ignite-mini{margin-top:16px;width:100%}
+
+/* phases */
+.phase-strip{display:flex;gap:12px;margin-bottom:16px;overflow-x:auto;padding:2px 2px 6px}
+.phase-chip{flex:none;padding:12px 16px;min-width:160px}
+.phase-chip .n{font:700 22px var(--display);letter-spacing:-.02em}
+.phase-chip .bar{margin-top:8px}
+.gantt-wrap{overflow:auto;padding:8px 4px 4px}
+.gantt text{font-family:var(--ui)}
+.gantt .bar-r{cursor:pointer}
+.gantt .bar-r:hover rect.b{fill-opacity:.26}
+.gantt .run{animation:breathe 1.6s ease-in-out infinite}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:12px;color:var(--mute)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.gstats{display:flex;gap:6px;flex-wrap:wrap}
+.approve{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:18px 20px;margin-bottom:18px;flex-wrap:wrap;background:color-mix(in srgb,var(--blue) 8%,var(--panel))}
+.btn.launch{padding:10px 20px;font-size:14px}
+
+/* board */
+.board{display:grid;grid-template-columns:repeat(6,minmax(200px,1fr));gap:14px;overflow-x:auto;padding-bottom:8px;min-height:60vh}
+.col{padding:4px;display:flex;flex-direction:column;gap:10px;background:transparent;box-shadow:none}
+.col-h{display:flex;align-items:center;gap:8px;padding:2px 6px 4px}
+.col-h b{font:600 13px var(--ui);display:flex;align-items:center;gap:7px}
+.col-h .cdot{width:8px;height:8px;border-radius:50%}
+.col-h span{font-size:12px;color:var(--mute);margin-left:auto}
+.card{padding:14px;border-radius:12px;background:var(--panel);box-shadow:var(--shadow);cursor:pointer;transition:transform .2s var(--ease),box-shadow .2s}
+.card:hover{transform:translateY(-1px);box-shadow:0 2px 4px rgba(0,0,0,.05),0 10px 26px rgba(0,0,0,.08)}
+.card .id{font:500 11.5px var(--mono);color:var(--mute)}
+.card h4{margin:3px 0 10px;font-size:14px;font-weight:600;line-height:1.3;letter-spacing:-.01em}
+.card .meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.card .step{font-size:12px;color:var(--mute);margin:10px 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-actions{display:flex;gap:6px;margin-top:12px}
+
+/* agents */
+.agents{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.agent{padding:18px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.agent-h{display:flex;gap:12px;align-items:center}
+.avatar{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font:600 14px var(--display);flex:none;color:#fff !important;background:var(--s-todo) !important}
+.avatar.live{background:linear-gradient(160deg,#5ac8fa,var(--blue)) !important}
+.term{background:var(--panel2);border-radius:10px;padding:10px 12px;font:12px/1.6 var(--mono);height:132px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;color:var(--mute)}
+.term div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k-tool{color:var(--blue)} .k-text{color:var(--text)} .k-system{color:var(--mute)} .k-error{color:var(--red)}
+.agent .nums{display:flex;gap:16px;font-size:12px;color:var(--mute);flex-wrap:wrap}
+.agent .nums b{color:var(--text);font-weight:600}
+.roster{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.roster .tag{padding:5px 10px}
+
+/* tokens */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:16px}
+.kpi{padding:18px}
+.kpi .v{font:700 28px/1.1 var(--display);margin-top:6px;letter-spacing:-.02em}
+.kpi .s{font-size:12px;color:var(--mute);margin-top:4px}
+.tok-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.hbars{padding:18px;display:flex;flex-direction:column;gap:12px}
+.hb{display:grid;grid-template-columns:180px 1fr 120px;gap:12px;align-items:center;font-size:13px;cursor:pointer}
+.hb .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb .track{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--fill2);gap:1px}
+.hb .track i{height:100%;display:block}
+.hb .val{font-size:12px;text-align:right;color:var(--mute)}
+
+/* feed */
+.feed{padding:4px 0;overflow:hidden}
+.ev{display:grid;grid-template-columns:76px 28px 1fr;gap:12px;padding:10px 18px;align-items:center}
+.ev + .ev{border-top:1px solid var(--line)}
+.ev[data-task]:hover{background:var(--fill2)}
+.ev time{font-size:12px;color:var(--dim)}
+.ev .ic{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;background:color-mix(in srgb,currentColor 14%,transparent)}
+.ev .who{font-weight:600;margin-right:6px}
+.filters{display:inline-flex;gap:2px;margin-bottom:14px;padding:2px;background:var(--fill2);border-radius:9px}
+.filters button{border:0;background:none;border-radius:7px;padding:5px 14px;cursor:pointer;font-size:13px;color:var(--text);text-transform:capitalize}
+.filters button.on{background:var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+
+/* chat (Messages style) */
+.comms{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
+.chat{display:flex;flex-direction:column;height:calc(100dvh - 210px);min-height:420px;overflow:hidden}
+.chat-log{flex:1;overflow:auto;padding:20px 18px;display:flex;flex-direction:column;gap:4px}
+.msg{max-width:78%;padding:8px 13px;border-radius:18px;font-size:14.5px;line-height:1.42;margin-top:8px}
+.msg .who{font-size:11px;color:var(--mute);margin:0 4px 3px}
+.msg .who span{margin-left:4px;color:var(--dim)}
+.msg.sup{background:var(--panel2);align-self:flex-start;border-bottom-left-radius:6px}
+.msg.me{background:var(--blue);color:#fff;align-self:flex-end;border-bottom-right-radius:6px}
+.msg.me .who,.msg.me .who span{color:rgba(255,255,255,.75)}
+.msg.sys{align-self:center;max-width:90%;font-size:12px;color:var(--mute);background:none;text-align:center;padding:6px 10px}
+.md-lite p{margin:3px 0}.md-lite h3{font-size:14px;margin:10px 0 4px}.md-lite code{font-family:var(--mono);font-size:12.5px;background:var(--fill2);padding:1px 5px;border-radius:5px}.md-lite pre{background:var(--fill2);padding:8px 10px;border-radius:8px;overflow:auto;font:12px var(--mono)}
+.dots{display:flex;gap:4px;padding:6px 2px}.dots i{width:7px;height:7px;border-radius:50%;background:var(--dim);animation:breathe 1.2s infinite}.dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}
+.composer{display:flex;gap:10px;padding:10px 12px;border-top:1px solid var(--line);align-items:flex-end}
+.composer textarea{min-height:40px;max-height:180px;border-radius:20px;padding:9px 16px}
+.composer .btn{border-radius:50%;width:36px;height:36px;padding:0;font-size:0}
+.composer .btn::after{content:"";width:16px;height:16px;background:#fff;-webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4l-7 7h4.5v9h5v-9H19z"/></svg>') center/contain no-repeat;mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4l-7 7h4.5v9h5v-9H19z"/></svg>') center/contain no-repeat}
+.qcard{padding:18px;margin-bottom:14px}
+.qcard.urgent{box-shadow:0 0 0 1.5px color-mix(in srgb,var(--orange) 60%,transparent),var(--shadow)}
+.qcard h4{margin:6px 0 10px;font-size:15px;font-weight:600}
+.opts{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.opt{border:0;background:var(--fill2);padding:8px 14px;border-radius:980px;cursor:pointer;transition:background .15s,transform .1s}
+.opt:hover{background:var(--fill)}
+.opt:active{transform:scale(.97)}
+.opt.rec{background:color-mix(in srgb,var(--blue) 14%,transparent);color:var(--blue)}
+.opt.rec::after{content:" · suggested";font-size:12px;opacity:.75}
+textarea,.inp{width:100%;background:var(--panel2);border:1px solid transparent;border-radius:10px;padding:9px 12px;outline:none;transition:border-color .15s,box-shadow .15s;color:var(--text)}
+textarea{min-height:70px;resize:vertical}
+textarea:focus,.inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 22%,transparent)}
+.inp{flex:1;min-width:0;font-size:13px}
+.qscroll{max-height:min(460px,52vh);overflow-y:auto;overscroll-behavior:contain}
+.lrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}
+.lrow + .lrow{border-top:1px solid var(--line)}
+.lrow .sel{width:auto;min-width:118px}
+.wrow{display:flex;gap:10px;align-items:flex-start;padding:9px 0}
+.wrow + .wrow{border-top:1px solid var(--line)}
+.wrow.done{align-items:center;font-size:13px}
+.ulist td{vertical-align:middle}
+.ulist tr.clk{cursor:pointer}.ulist tr.clk:hover td{background:var(--fill2)}
+.ulist tr.open td{background:var(--fill2)}
+.ulist tr.detail td{background:var(--panel2);padding:0}
+.thread{padding:12px 16px}
+.thread + .thread{border-top:1px solid var(--line)}
+.bubble{padding:7px 12px;border-radius:16px;margin-top:6px;font-size:13px;max-width:92%;width:fit-content}
+.bubble.q{background:var(--panel2);border-bottom-left-radius:5px}
+.bubble.a{background:var(--blue);color:#fff;margin-left:auto;border-bottom-right-radius:5px}
+.bubble small{display:block;font-size:11px;opacity:.7;margin-bottom:1px}
+.picker{display:flex;flex-direction:column;gap:14px}
+.mhint{font-size:12px;color:var(--mute);line-height:1.4;margin-top:2px}.mhint b{color:var(--text);font-weight:600}
+.warn{font-size:12.5px;padding:8px 12px;border-radius:10px;background:color-mix(in srgb,var(--orange) 14%,transparent);color:var(--text)}
+.mcell{display:flex;flex-direction:column;gap:6px}.mcell .sel{width:100%}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.7fr);gap:8px 10px;align-items:start}
+.prow > div:first-child{grid-column:1/-1;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.prow .mhint{grid-column:1/-1;padding:0 2px 6px}
+.prow + .prow{border-top:1px solid var(--line);padding-top:14px}
+.sel{appearance:none;background:var(--panel2) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M1 1l4 4 4-4" stroke="%238e8e93" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>') no-repeat right 10px center;border:0;border-radius:8px;padding:7px 28px 7px 10px;cursor:pointer;font-size:13px}
+.prow .sel{width:100%}
+
+/* permissions */
+.clone-row{display:flex;align-items:center;gap:8px;margin-top:8px}
+.pcard{padding:18px 18px 14px}
+.pc-head{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.pc-title{font-size:15px;font-weight:600}
+.pc-sub{font-size:12.5px;color:var(--mute);margin-top:2px;overflow-wrap:anywhere}
+.pc-list{margin:12px 0 4px;border-top:1px solid var(--line,var(--fill2))}
+.pr{padding:10px 0;border-bottom:1px solid var(--line,var(--fill2));display:grid;gap:4px}
+.pr-top{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.pr-top label{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px;min-width:0}
+.pr code{font-size:11.5px;color:var(--mute);overflow-wrap:anywhere}
+.pr-risk{font-size:12.5px;color:var(--text);opacity:.82}
+.risk{font-size:11px;font-weight:600;padding:2px 8px;border-radius:980px;white-space:nowrap}
+.risk.low{background:color-mix(in srgb,var(--green) 16%,transparent);color:var(--green)}
+.risk.medium{background:color-mix(in srgb,var(--orange) 18%,transparent);color:var(--orange)}
+.risk.high{background:color-mix(in srgb,var(--red) 16%,transparent);color:var(--red)}
+.pc-actions{display:flex;gap:8px;margin-top:12px}
+.pc-reply{margin-top:10px;font-size:12.5px;color:var(--mute)}
+.pc-reply summary{cursor:pointer;width:max-content}
+.pc-reply textarea{margin-top:8px}
+.approve-perms{flex-basis:100%;margin-top:2px}
+.rules{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.rules code{background:var(--fill2);padding:3px 8px;border-radius:6px;font-size:12px}
+.rule{display:inline-flex;align-items:center;gap:2px;background:var(--fill2);border-radius:6px;padding-right:2px}
+.rule code{background:none}
+.x2{border:0;background:none;color:var(--mute);cursor:pointer;font-size:15px;line-height:1;padding:2px 6px;border-radius:6px}
+.x2:hover{color:var(--red)}
+
+/* people */
+.av{position:relative;display:inline-grid;place-items:center;border-radius:50%;background:linear-gradient(160deg,#ffcc00,#ff9500);color:#fff;font-weight:600;overflow:hidden;flex:none;vertical-align:middle}
+.av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tag.person{display:inline-flex;align-items:center;gap:5px;color:var(--text);padding-left:3px}
+.sec.person-box{flex-direction:row;align-items:center;gap:12px;padding:12px 14px;background:var(--panel2);border-radius:12px}
+.approve.pr{background:color-mix(in srgb,var(--green) 8%,var(--panel))}
+code{font-family:var(--mono);font-size:.92em}
+
+/* ignite */
+.ignite{max-width:600px;margin:7vh auto 0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px}
+.appicon{width:104px;height:104px;border-radius:24px;display:grid;place-items:center;background:linear-gradient(160deg,#5ac8fa,#007aff 55%,#5856d6);box-shadow:0 10px 30px rgba(0,122,255,.3),inset 0 1px 0 rgba(255,255,255,.35)}
+.appicon svg{width:54px;height:54px;color:#fff}
+.ignite h1{font:700 32px var(--display);letter-spacing:-.025em;margin:22px 0 0}
+.ignite .pitch{font-size:17px;line-height:1.5;color:var(--mute);margin:12px 0 10px;text-wrap:balance}
+.ignite .pitch b{color:var(--text);font-weight:600}
+.ignite .peek{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:4px 0 20px}
+.ignite-btn{font-size:17px;font-weight:600;padding:13px 30px}
+
+/* drawer (inspector sheet) */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.18);z-index:var(--z-scrim);opacity:0;pointer-events:none;transition:opacity .3s}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:10px;right:10px;bottom:10px;width:min(600px,calc(100vw - 20px));z-index:var(--z-drawer);background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:saturate(180%) blur(30px);-webkit-backdrop-filter:saturate(180%) blur(30px);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.25),0 0 0 1px var(--line);transform:translateX(calc(100% + 20px));transition:transform .45s var(--ease);display:flex;flex-direction:column;overflow:hidden}
+.drawer.on{transform:none}
+.drawer-h{padding:20px 22px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start}
+.drawer-h h2{margin:2px 0 10px;font:700 21px var(--display);letter-spacing:-.018em}
+.drawer-b{overflow:auto;padding:18px 22px 40px;display:flex;flex-direction:column;gap:18px}
+.x{margin-left:auto;background:var(--fill2);border:0;border-radius:50%;width:28px;height:28px;cursor:pointer;color:var(--mute);flex:none;font-size:12px}
+.x:hover{background:var(--fill)}
+.sec{display:flex;flex-direction:column;gap:6px}
+.sec ul{margin:0;padding-left:18px}
+.md{background:var(--panel2);border-radius:10px;padding:12px 14px;font-size:13px;overflow-wrap:anywhere}
+.md h1,.md h2,.md h3{font-size:13px;margin:0 0 6px}
+.md p{margin:4px 0}
+.md code{font-family:var(--mono);font-size:12px;background:var(--fill2);padding:1px 5px;border-radius:4px}
+.md pre{background:var(--fill2);padding:8px;border-radius:8px;overflow:auto;font:12px var(--mono);margin:6px 0}
+.logbox{background:var(--panel2);border-radius:10px;padding:10px 12px;font:12px/1.6 var(--mono);height:300px;overflow:auto}
+.logbox .ln{display:grid;grid-template-columns:62px 1fr;gap:8px;white-space:pre-wrap;word-break:break-word}
+.logbox .ln time{color:var(--dim)}
+.att{width:100%;border-collapse:collapse;font-size:12.5px}
+.att td,.att th{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
+.att th{font-weight:600;font-size:11.5px;color:var(--mute)}
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(12px) scale(.96);opacity:0;transition:all .35s var(--ease);z-index:var(--z-toast);padding:10px 18px;border-radius:14px;background:color-mix(in srgb,var(--panel) 85%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 10px 30px rgba(0,0,0,.18),0 0 0 1px var(--line);font-weight:500;pointer-events:none}
+.toast.on{opacity:1;transform:translateX(-50%)}
+.toast.err{color:var(--red)}
+.offline{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:var(--z-toast);padding:6px 14px;border-radius:980px;background:var(--red);color:#fff;font-size:12px;font-weight:600;display:none}
+
+@media (max-width:1100px){.tok-grid,.comms{grid-template-columns:1fr}.hstats .opt-hide{display:none}}
+@media (max-width:760px){
+  body{overflow:auto}
+  .app{grid-template-columns:1fr}
+  .sidebar{position:fixed;left:0;right:0;bottom:0;top:auto;flex-direction:row;padding:4px 6px calc(4px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--line);overflow-x:auto}
+  .sidebar > :not(#nav){display:none}
+  #nav{flex-direction:row;justify-content:space-around;width:100%}
+  #nav button{flex-direction:column;gap:2px;font-size:10px;padding:5px 4px;width:auto;min-width:52px;color:var(--mute)}
+  #nav button.active{background:none;color:var(--blue)}
+  #nav button svg{width:22px;height:22px;color:inherit}
+  #nav .badge{position:absolute;margin:-2px 0 0 22px;height:16px;min-width:16px;font-size:10px}
+  #nav button{position:relative}
+  .content{height:auto;min-height:100dvh;padding-bottom:64px}
+  .toolbar{position:sticky;top:0;flex-wrap:wrap;padding:10px 16px;gap:10px}
+  .tb-title{display:none}
+  .proj-select{display:block;flex:1;min-width:0;font-weight:600;font-size:15px;background-color:var(--fill2)}
+  .hstats{width:100%;margin:0;gap:14px;overflow-x:auto;justify-content:space-between}
+  .chip{align-items:flex-start}
+  .wrap{padding:20px 16px 40px}
+  .view-title h1{font-size:26px}
+  .board{grid-template-columns:repeat(6,82vw)}
+  .agents,.grid-cards{grid-template-columns:1fr}
+  .hb{grid-template-columns:96px 1fr 92px}
+  .ev{grid-template-columns:52px 24px 1fr;padding:9px 12px}
+  .chat{height:calc(100dvh - 330px);min-height:380px}.msg{max-width:88%}
+  .prow{grid-template-columns:1fr}
+  .drawer{top:auto;left:0;right:0;bottom:0;width:100%;height:88dvh;border-radius:18px 18px 0 0;transform:translateY(105%)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" aria-label="Navigation">
+    <div class="brand"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></div><b>Mission Control</b></div>
+    <nav id="nav"></nav>
+    <div class="side-sec">Projects</div>
+    <div id="projList"></div>
+    <button class="pitem side-add" id="sideAdd">＋ Add Project…</button>
+  </aside>
+  <div class="content">
+    <header class="toolbar">
+      <div class="tb-title"><h2 id="tbTitle">Mission Control</h2><small id="tbSub"></small></div>
+      <select class="proj-select sel" id="projSel" aria-label="Project"></select>
+      <div class="hstats" id="hstats"></div>
+    </header>
+    <main id="main"></main>
+  </div>
+</div>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Task details"></aside>
+<div class="toast" id="toast"></div>
+<div class="offline" id="offline">Can’t reach the dashboard server. Retrying…</div>
+
+<script>
+const TOKEN = "__MC_TOKEN__";
+const STATUS = ["todo","running","review","needs_changes","blocked","done"];
+const SLABEL = {todo:"Todo",running:"Running",review:"Review",needs_changes:"Needs changes",blocked:"Blocked",done:"Done",cancelled:"Cancelled"};
+const SCOL = s => `var(--s-${s})`;
+const ICONS = {
+  overview:'<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
+  phases:'<rect x="3" y="4.5" width="9" height="4" rx="2"/><rect x="8" y="10" width="10" height="4" rx="2"/><rect x="13" y="15.5" width="8" height="4" rx="2"/>',
+  board:'<rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="4" height="8" rx="1"/>',
+  agents:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/>',
+  tokens:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  feed:'<path d="M4 6h16M4 12h10M4 18h13"/>',
+  comms:'<path d="M21 12a8 8 0 0 1-11.8 7L3 21l2-5.5A8 8 0 1 1 21 12z"/>'
+};
+const VIEWS = [["overview","All Projects"],["comms","Chat"],["phases","Timeline"],["board","Board"],["agents","Agents"],["tokens","Usage"],["feed","Activity"]];
+const EVI = {init:["◎","var(--cyan)"],plan:["⌘","var(--violet)"],task_added:["+","var(--violet)"],run_started:["▶","var(--cyan)"],report:["✎","var(--violet)"],
+  check:["✓","var(--lime)"],approved:["★","var(--lime)"],changes:["↺","var(--amber)"],question:["?","var(--magenta)"],answer:["↳","var(--cyan)"],
+  note:["✉","var(--blue)"],error:["!","var(--red)"],stopped:["■","var(--amber)"],cancelled:["✕","var(--red)"],decision:["◆","var(--violet)"],
+  checkpoint:["⧉","var(--mute)"],autopilot:["⟳","var(--cyan)"],task_updated:["⚙","var(--mute)"]};
+
+let S = {projects:[], cur:null, st:null, view: lsGet("mc.view") || "phases", drawer:null, feedFilter:"all", drafts:{}, logs:{}, logAttempt:null, hashes:{}};
+
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = n => n>=1e6 ? (n/1e6).toFixed(n>=1e7?1:2)+"M" : n>=1e3 ? (n/1e3).toFixed(n>=1e4?0:1)+"k" : String(Math.round(n||0));
+const money = n => "$"+(n||0).toFixed(n>=100?0:n>=1?2:3);
+const ts = s => s ? new Date(s).getTime() : 0;
+function ago(s){ if(!s) return ""; const d=(Date.now()-ts(s))/1000; return d<60?Math.max(0,d|0)+"s":d<3600?(d/60|0)+"m":d<86400?(d/3600|0)+"h":(d/86400|0)+"d"; }
+function dur(a,b){ const d=((b?ts(b):Date.now())-ts(a))/1000; if(!a||d<0) return "–"; return d<60?(d|0)+"s":d<3600?(d/60|0)+"m "+((d%60)|0)+"s":(d/3600|0)+"h "+((d%3600)/60|0)+"m"; }
+const clock = s => s ? new Date(s).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}) : "";
+const tokIn = t => (t.input||0)+(t.cache_read||0)+(t.cache_write||0);
+
+async function api(path){ const r = await fetch(path); if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error || r.status); return r.json(); }
+async function post(path, body){
+  const r = await fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-MC-Token":TOKEN},body:JSON.stringify({p:S.cur,...body})});
+  const j = await r.json().catch(()=>({})); if(!r.ok){ if(!j.suggest_target) toast(j.error||"failed", true); const err=new Error(j.error); err.data=j; throw err; } return j;
+}
+function toast(msg, err){ const t=$("toast"); t.textContent=msg; t.className="toast on"+(err?" err":""); clearTimeout(t._h); t._h=setTimeout(()=>t.className="toast",2600); }
+
+/* ───────── polling ───────── */
+async function loadProjects(){
+  S.projects = await api("/api/projects");
+  if(!S.cur || !S.projects.find(p=>p.path===S.cur)){
+    const saved = lsGet("mc.project");
+    S.cur = (S.projects.find(p=>p.path===saved) || [...S.projects].sort((a,b)=>b.updated.localeCompare(a.updated))[0] || {}).path || null;
+  }
+  const sel = $("projSel");
+  const opts = S.projects.map(p=>`<option value="${esc(p.path)}" ${p.path===S.cur?"selected":""}>${esc(p.name)}${p.needs_you?"  ●":""}</option>`).join("") || `<option>No missions yet</option>`;
+  if(sel.innerHTML!==opts) sel.innerHTML = opts;
+}
+async function tick(){
+  try{
+    await loadProjects();
+    const cp = S.projects.find(p=>p.path===S.cur);
+    S.st = cp && cp.initialized ? await api("/api/state?p="+encodeURIComponent(S.cur)) : null;
+    if(S.view==="tokens") await loadUsage();
+    $("offline").style.display="none";
+    render();
+    if(S.drawer) refreshLog();
+  }catch(e){ $("offline").style.display="block"; console.warn(e); }
+}
+setInterval(tick, 2000);
+
+/* ───────── rendering ───────── */
+function changed(key, data){ const h=JSON.stringify(data); if(S.hashes[key]===h) return false; S.hashes[key]=h; return true; }
+
+function render(){
+  renderNav(); renderHeader();
+  const v = S.view, cp = S.projects.find(p=>p.path===S.cur), splash = cp && !cp.initialized && v!=="overview";
+  const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
+  if(changed("main", [splash?"ignite":v, S.cur, data])){
+    const act = document.activeElement, aid = act && act.id, sel = act && act.selectionStart;
+    const cl=$("chatlog"), stick=!cl || cl.scrollTop+cl.clientHeight>=cl.scrollHeight-40, qsTop=$("qscroll")?.scrollTop||0;
+    $("main").innerHTML = `<div class="wrap">${splash ? viewIgnite(cp) : (VIEW_FN[v]||viewPhases)()}</div>`;
+    if($("chatlog") && stick) $("chatlog").scrollTop=$("chatlog").scrollHeight;
+    if($("qscroll")) $("qscroll").scrollTop=qsTop;
+    if(v==="agents") hydrateTerms();
+    if(aid && $(aid)){ $(aid).focus(); try{ $(aid).setSelectionRange(sel,sel); }catch(e){} }
+  }
+  if(S.drawer) renderDrawer();
+}
+const VIEW_FN = {overview:viewOverview, phases:viewPhases, board:viewBoard, agents:viewAgents, tokens:viewTokens, feed:viewFeed, comms:viewComms};
+
+function renderNav(){
+  const needs = (S.st?.questions||[]).filter(q=>q.to==="user"&&q.status==="open").length + (S.st?.mission.phase==="awaiting_approval"?1:0);
+  const html = VIEWS.map(([k,l])=>`<button class="${S.view===k?"active":""}" data-view="${k}" title="${l}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg><span>${l}</span>${k==="comms"&&needs?`<em class="badge">${needs}</em>`:""}</button>`).join("");
+  if($("nav").innerHTML!==html) $("nav").innerHTML = html;
+  const pl = S.projects.map(p=>{ const pct=p.total?Math.round(p.counts.done/p.total*100):0;
+    const col=!p.initialized?"var(--s-cancelled)":p.supervisor?.running||p.counts?.running?"var(--blue)":p.needs_you||p.phase==="awaiting_approval"?"var(--orange)":pct===100?"var(--green)":"var(--s-todo)";
+    return `<div class="pwrap"><button class="pitem ${p.path===S.cur&&S.view!=="overview"?"active":""}" data-proj="${esc(p.path)}"><i class="dot" style="background:${col}"></i><span class="nm">${esc(p.name)}</span>${p.needs_you?`<em class="badge">${p.needs_you}</em>`:p.initialized&&p.total?`<span class="pct">${pct}%</span>`:""}</button><button class="premove-s" data-remove="${esc(p.path)}" title="Remove from dashboard" aria-label="Remove ${esc(p.name)} from the dashboard">×</button></div>`; }).join("");
+  if($("projList").innerHTML!==pl) $("projList").innerHTML = pl;
+  const cp=S.projects.find(p=>p.path===S.cur);
+  $("tbTitle").textContent = S.view==="overview" ? "All Projects" : (cp?.name || "Mission Control");
+  const gb=S.view!=="overview"&&gitInfo()?.branch;
+  $("tbSub").textContent = S.view==="overview" ? "" : (gb ? `⑂ ${gb}  ·  ` : "") + (cp?.goal || cp?.path || "");
+}
+function renderHeader(){
+  const st=S.view==="overview"?null:S.st; if(!st){ if(changed("header","")) $("hstats").innerHTML=""; return; }
+  const sp=st.supervisor||{}, gated=["briefing","awaiting_approval"].includes(st.mission.phase);
+  const ts_=st.tasks, done=ts_.filter(t=>t.status==="done").length, run=ts_.filter(t=>t.status==="running"&&t.executor!=="human").length;
+  const tok=ts_.reduce((a,t)=>a+tokIn(t.tokens||{})+(t.tokens?.output||0),0), cost=ts_.reduce((a,t)=>a+(t.tokens?.cost_usd||0),0);
+  const pct = ts_.length? Math.round(done/ts_.length*100):0;
+  const html = `
+    <div class="chip supchip ${sp.running?"live":""}" title="${esc(sp.step||"")}"><small>Supervisor${sp.mode==="dashboard"?" · "+esc(sp.model||st.runners[sp.runner||"claude-supervisor"]?.model||""):""}</small><span><i class="dot"></i>${sp.mode==="dashboard"?(sp.running?"Thinking…":"Idle"):"External"}</span></div>
+    <div class="chip"><small>${gated?"Phase":"Progress"}</small><span style="color:${gated?"var(--orange)":"var(--text)"}">${gated?(st.mission.phase==="briefing"?"Briefing":"Needs approval"):pct+"%"}</span></div>
+    <div class="chip"><small>Running</small><span>${run}</span></div>
+    <div class="chip opt-hide"><small>Tokens</small><span>${fmt(tok)}</span></div>
+    <div class="chip opt-hide"><small>Cost</small><span>${money(cost)}</span></div>
+    <div class="toggle ${st.mission.autopilot?"on":""}" id="autoT" role="switch" aria-checked="${!!st.mission.autopilot}" title="Autopilot: launch tasks as soon as their dependencies are done"><small>Autopilot</small><div class="sw"></div></div>
+    <button class="btn" data-reveal="mission" title="Open the mission folder (reports, feedback, run logs) in Finder">Open folder</button>
+    <button class="btn primary" id="runReady" ${st.ready.length&&!gated?"":"disabled"}>Run Ready${st.ready.length?` (${st.ready.length})`:""}</button>`;
+  if(changed("header",html)) $("hstats").innerHTML = html;
+}
+
+function head(title, sub, right=""){ return `<div class="view-title"><div><h1>${title}</h1>${sub?`<p>${sub}</p>`:""}</div>${right}</div>`; }
+function noMission(){ return `<div class="empty">No mission in this project yet.<br><br>In any project, ask your AI to <b>use mission control</b>, or run <code>python3 mc.py init</code>.</div>`; }
+function statusPill(s){ return `<span class="status ${s}" style="color:${SCOL(s)}">${SLABEL[s]||s}</span>`; }
+function avatar(login, size=20){ const ini=esc((login||"?").slice(0,2).toUpperCase());
+  return `<span class="av" style="width:${size}px;height:${size}px;font-size:${Math.round(size*.42)}px">${ini}<img src="https://github.com/${encodeURIComponent(login)}.png?size=${size*2}" alt="" loading="lazy" onerror="this.remove()"></span>`; }
+function execTag(t){ if(t.executor==="human") return `<span class="tag person">${avatar(t.assignee,16)}@${esc(t.assignee)}</span>`;
+  const r=S.st.runners[t.executor]; return `<span class="tag" title="${esc(r?.label||"")}">${esc(t.executor)}${t.model?":"+esc(t.model):""}</span>`; }
+function gitInfo(){ return S.st?.mission?.git?.enabled ? S.st.mission.git : null; }
+function prBanner(){
+  const g=gitInfo(), st=S.st; if(!g) return "";
+  const T=st.tasks.filter(t=>t.status!=="cancelled");
+  if(g.pr) return `<div class="panel approve pr"><div><div class="label" style="color:var(--green)">Pull request open</div><div style="font-weight:600;margin-top:2px">${esc(g.branch)} → ${esc(g.base)}</div></div><a class="btn" href="${esc(g.pr)}" target="_blank" rel="noopener">View on GitHub ↗</a></div>`;
+  if(!T.length || !T.every(t=>t.status==="done")) return "";
+  return `<div class="panel approve"><div><div class="label" style="color:var(--green)">All tasks are done</div><div style="font-size:15px;font-weight:600;margin-top:4px">Ready to share with your team</div><div class="muted" style="font-size:12.5px">Pushes <code>${esc(g.branch)}</code> and opens one pull request into <code>${esc(g.base)}</code>.</div></div><button class="btn primary launch" id="prBtn">Create Pull Request</button></div>`;
+}
+
+/* ── overview ── */
+function ring(pct, size=74, color="var(--green)"){
+  const r=(size-10)/2, c=2*Math.PI*r;
+  return `<svg width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" style="stroke:color-mix(in srgb,${color} 18%,transparent)" stroke-width="8"/>
+  <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" style="stroke:${color}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-pct/100)}" transform="rotate(-90 ${size/2} ${size/2})"/></svg>`;
+}
+function viewOverview(){
+  return head("All Projects", `${S.projects.length} project${S.projects.length===1?"":"s"}`) + `<div class="grid-cards">` + S.projects.map(p=>{
+    if(!p.initialized) return `<div class="panel pcard ${p.path===S.cur?"current":""}" data-proj="${esc(p.path)}"><h3>${esc(p.name)}</h3><div class="goal mono" style="font-size:11.5px">${esc(p.path)}</div>
+      <div class="muted" style="font-size:13px;margin-top:10px">Not under Mission Control yet.</div><button class="btn primary ignite-mini" data-ignite="${esc(p.path)}">Ignite Mission Control</button><button class="btn sm premove" data-remove="${esc(p.path)}">Remove from dashboard</button></div>`;
+    const pct = p.total? Math.round(p.counts.done/p.total*100):0;
+    return `<div class="panel pcard ${p.path===S.cur?"current":""}" data-proj="${esc(p.path)}">
+      ${p.needs_you?`<div class="needs">${p.needs_you} waiting on you</div>`:""}
+      <h3>${esc(p.name)}</h3><div class="goal">${esc(p.goal||p.path)}</div>
+      <div class="row"><div class="ring">${ring(pct)}<b>${pct}%</b></div>
+        <div class="mini-stats">
+          <div><small>Running</small><span>${p.counts.running}</span></div>
+          <div><small>In review</small><span>${p.counts.review}</span></div>
+          <div><small>Blocked</small><span style="${p.counts.blocked?"color:var(--pink)":""}">${p.counts.blocked}</span></div>
+          <div><small>Done</small><span>${p.counts.done} of ${p.total}</span></div>
+          <div><small>Tokens</small><span>${fmt(tokIn(p.tokens)+p.tokens.output)}</span></div>
+          <div><small>Cost</small><span>${money(p.tokens.cost_usd)}</span></div>
+        </div></div>
+      <div class="muted" style="font-size:12px;margin-top:14px">${p.phase==="briefing"?'<span style="color:var(--orange)">Briefing</span> · ':p.phase==="awaiting_approval"?'<span style="color:var(--orange)">Plan needs approval</span> · ':""}${p.supervisor?.running?'<span style="color:var(--blue)">Supervisor thinking</span> · ':""}${p.autopilot?"Autopilot on · ":""}Updated ${ago(p.updated)} ago</div>
+      <button class="btn sm premove" data-remove="${esc(p.path)}">Remove</button>
+    </div>`;}).join("") + addProjectCard() + `</div>`;
+}
+
+/* ── phases (dependency gantt) ── */
+function schedule(tasks){
+  const by=Object.fromEntries(tasks.map(t=>[t.id,t])), start={}, end={};
+  const visit=(id,seen)=>{ if(id in end) return end[id]; if(seen.has(id)) return 0; seen.add(id);
+    const deps=(by[id].depends_on||[]).filter(d=>by[d]); const s=deps.length?Math.max(...deps.map(d=>visit(d,seen))):0;
+    start[id]=s; end[id]=s+Math.max(1,by[id].estimate||1); return end[id]; };
+  tasks.forEach(t=>visit(t.id,new Set()));
+  const total=Math.max(1,...Object.values(end)), crit=new Set();
+  let cur=tasks.filter(t=>end[t.id]===total).map(t=>t.id);
+  while(cur.length){ const nx=[]; cur.forEach(id=>{ if(crit.has(id)) return; crit.add(id); (by[id].depends_on||[]).forEach(d=>{ if(by[d]&&end[d]===start[id]) nx.push(d); }); }); cur=nx; }
+  return {start,end,total,crit};
+}
+function viewPhases(){
+  const st=S.st; if(!st) return head("Timeline","")+noMission();
+  const tasks=st.tasks.filter(t=>t.status!=="cancelled");
+  if(!tasks.length) return head("Timeline","")+`<div class="empty">No plan yet. ${st.mission.phase==="briefing"?'Your supervisor is in its briefing. Tell it your goal in <a href="#" data-view="comms">Chat</a>.':"The supervisor hasn't planned any tasks yet."}</div>`;
+  const {start,end,total,crit}=schedule(tasks);
+  const phases={}; tasks.forEach(t=>(phases[t.phase]=phases[t.phase]||[]).push(t));
+  const maxPar = Math.max(...Array.from({length:total},(_,u)=>tasks.filter(t=>start[t.id]<=u&&end[t.id]>u).length));
+  const rows=[...tasks].sort((a,b)=>start[a.id]-start[b.id]||a.phase-b.phase||a.id.localeCompare(b.id));
+  const W=Math.max(320,($("main").clientWidth||900)-Math.min(64,($("main").clientWidth||900)*.08)-16), mobile=W<700, G=mobile?92:240, RH=48, TOP=30;
+  const unit=Math.max(40,(W-G-16)/total), SW=G+unit*total+16, SH=TOP+rows.length*RH+8;
+  const y={}; rows.forEach((t,i)=>y[t.id]=TOP+i*RH);
+  const S_=s=>`var(--s-${s})`;
+  let svg=`<svg class="gantt" width="${SW}" height="${SH}" viewBox="0 0 ${SW} ${SH}" role="img" aria-label="Task dependency timeline">
+  <defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L8 4L0 8z" style="fill:var(--dim)"/></marker>
+  <marker id="ahc" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L8 4L0 8z" style="fill:var(--crit)"/></marker></defs>`;
+  rows.forEach((t,i)=>{ if(i) svg+=`<line x1="0" x2="${SW}" y1="${y[t.id]}" y2="${y[t.id]}" style="stroke:var(--line)"/>`; });
+  for(let u=0;u<total;u++){ const x=G+u*unit; svg+=`<line x1="${x}" x2="${x}" y1="${TOP-6}" y2="${SH}" style="stroke:var(--line)" stroke-dasharray="2 4"/><text x="${x+6}" y="${TOP-12}" font-size="11" style="fill:var(--dim)">${u+1}</text>`; }
+  rows.forEach(t=>(t.depends_on||[]).forEach(d=>{ if(!(d in end)) return;
+    const x1=G+end[d]*unit-6, y1=y[d]+RH/2, x2=G+start[t.id]*unit+4, y2=y[t.id]+RH/2, c=crit.has(d)&&crit.has(t.id)&&end[d]===start[t.id];
+    const mx=Math.max(12,(x2-x1)/2);
+    svg+=`<path d="M${x1} ${y1} C${x1+mx} ${y1},${x2-mx} ${y2},${x2-2} ${y2}" fill="none" style="stroke:${c?"var(--crit)":"var(--dim)"}" stroke-opacity="${c?.85:.6}" stroke-width="1.4" marker-end="url(#${c?"ahc":"ah"})"/>`; }));
+  rows.forEach(t=>{
+    const x=G+start[t.id]*unit+4, w=(end[t.id]-start[t.id])*unit-10, yy=y[t.id]+9, h=RH-18, col=S_(t.status), p=t.status==="done"?100:(t.progress||0);
+    const label = mobile||w<120 ? t.id : `${t.id} · ${t.status==="running"?p+"%":SLABEL[t.status]}`;
+    svg+=`<g class="bar-r" data-task="${t.id}">
+      <rect class="b" x="${x}" y="${yy}" width="${w}" height="${h}" rx="${h/2}" style="fill:${col}" fill-opacity=".16"/>
+      ${p>0&&p<100?`<rect class="${t.status==="running"?"run":""}" x="${x}" y="${yy}" width="${Math.max(h,w*p/100)}" height="${h}" rx="${h/2}" style="fill:${col}" fill-opacity=".32"/>`:""}
+      ${t.status==="done"?`<rect x="${x}" y="${yy}" width="${w}" height="${h}" rx="${h/2}" style="fill:${col}" fill-opacity=".85"/>`:""}
+      <text x="${x+12}" y="${yy+h/2+.5}" dominant-baseline="middle" font-size="12" font-weight="600" style="fill:${t.status==="done"?"#fff":col}">${esc(w>58?label:t.id.replace("T-",""))}</text>
+      <title>${esc(t.id+" "+t.title)}: ${SLABEL[t.status]}${t.step?" · "+esc(t.step):""}</title></g>
+    <g class="bar-r" data-task="${t.id}"><rect x="0" y="${y[t.id]}" width="${G-8}" height="${RH}" fill="transparent"/>
+      <circle cx="10" cy="${y[t.id]+RH/2}" r="4" style="fill:${col}"/>
+      <text x="22" y="${y[t.id]+RH/2-(mobile?0:8)}" dominant-baseline="middle" font-size="${mobile?12:11}" style="fill:var(--mute)">${t.id}${crit.has(t.id)&&!mobile?' · critical':""}</text>
+      ${mobile?"":`<text x="22" y="${y[t.id]+RH/2+9}" dominant-baseline="middle" font-size="13" font-weight="500" style="fill:var(--text)">${esc(trunc(t.title,28))}</text>`}</g>`;
+  });
+  svg+=`</svg>`;
+  const levels=Object.keys(phases).map(Number).sort((a,b)=>a-b);
+  const strip=levels.map(l=>{ const ts_=phases[l], d=ts_.filter(t=>t.status==="done").length;
+    return `<div class="panel phase-chip"><div class="label">Phase ${l+1}</div><div style="display:flex;align-items:baseline;gap:8px;margin-top:2px"><span class="n">${d}/${ts_.length}</span><span class="muted" style="font-size:12px">done</span></div><div class="bar"><i style="width:${d/ts_.length*100}%;background:var(--green)"></i></div></div>`; }).join("");
+  return head("Timeline", "Tasks that can run in parallel start together. Dependent tasks start after the tasks they wait for.",
+      `<div class="gstats"><span class="tag">${tasks.length} tasks</span><span class="tag">${levels.length} phases</span><span class="tag">up to ${maxPar} in parallel</span><span class="tag" style="color:var(--crit)">critical path: ${crit.size} tasks</span></div>`)
+    + approveBanner() + prBanner() + `<div class="phase-strip">${strip}</div><div class="panel gantt-wrap">${svg}</div>
+    <div class="legend">${STATUS.map(s=>`<span><i style="background:${SCOL(s)}"></i>${SLABEL[s]}</span>`).join("")}<span><i style="background:var(--crit)"></i>Critical path</span><span>Columns are estimate points</span></div>`;
+}
+const cssCache={}; function getCss(v){ return cssCache[v] ??= (getComputedStyle(document.documentElement).getPropertyValue(v).trim().startsWith("var(") ? getCss(getComputedStyle(document.documentElement).getPropertyValue(v).trim().slice(4,-1)) : getComputedStyle(document.documentElement).getPropertyValue(v).trim()); }
+const trunc=(s,n)=>s.length>n?s.slice(0,n-1)+"…":s;
+
+/* ── board ── */
+function viewBoard(){
+  const st=S.st; if(!st) return head("Board","")+noMission();
+  const deps = t => (t.depends_on||[]).filter(d=>st.tasks.find(x=>x.id===d)?.status!=="done");
+  return head("Board", "Every task by status. Open a card for its live transcript, report and tokens.") + `<div class="board">` + STATUS.map(s=>{
+    const items=st.tasks.filter(t=>t.status===s);
+    return `<div class="panel col"><div class="col-h"><b><i class="cdot" style="background:${SCOL(s)}"></i>${SLABEL[s]}</b><span>${items.length}</span></div>` + items.map(t=>{
+      const waiting=deps(t), ready=st.ready.includes(t.id);
+      return `<div class="card ${t.status}" data-task="${t.id}">
+        <div class="id">${t.id}${t.paused?' <span class="muted">· paused</span>':""}</div><h4>${esc(t.title)}</h4>
+        <div class="meta">${execTag(t)}<span class="tag">⏱ ${t.estimate}</span>${(t.tokens?.cost_usd)?`<span class="tag">${money(t.tokens.cost_usd)}</span>`:""}${t.attempts?.length>1?(()=>{ const cap=(st.mission.max_attempts||3)+(t.attempt_bonus||0), n=t.attempts.length; return `<span class="tag" style="${n>=cap?"color:var(--orange)":""}">try ${n}/${cap}</span>`; })():""}</div>
+        ${t.status==="running"?(t.executor==="human"?`<div class="step">${esc(t.step||"")}</div>`:`<div class="step">› ${esc(t.step||"…")}</div><div class="bar"><i style="width:${t.progress||0}%"></i></div>`):""}
+        ${t.status==="blocked"||t.status==="review"?`<div class="step">› ${esc(t.step||"")}</div>`:""}
+        ${waiting.length&&s!=="done"?`<div class="step">⧗ waits for ${waiting.join(", ")}</div>`:""}
+        ${ready?`<div class="card-actions"><button class="btn sm primary" data-act="run" data-t="${t.id}">▶ Run</button></div>`:""}
+        ${t.status==="running"?`<div class="card-actions"><button class="btn sm danger" data-act="stop" data-t="${t.id}">■ Stop</button></div>`:""}
+      </div>`;}).join("") + `</div>`; }).join("") + `</div>`;
+}
+
+/* ── agents ── */
+function viewAgents(){
+  const st=S.st; if(!st) return head("Agents","")+noMission();
+  const live=st.tasks.filter(t=>t.status==="running"&&t.executor!=="human");
+  const recent=st.tasks.filter(t=>t.status!=="running"&&t.run?.finished).sort((a,b)=>ts(b.run.finished)-ts(a.run.finished)).slice(0,4);
+  const card=(t,isLive)=>{ const r=st.runners[t.executor]||{}, tk=t.tokens||{}, col=isLive?"var(--cyan)":SCOL(t.status);
+    return `<div class="panel agent" data-task="${t.id}" style="cursor:pointer">
+      <div class="agent-h"><div class="avatar ${isLive?"live":""}" >${esc((r.label||t.executor).slice(0,2).toUpperCase())}</div>
+        <div style="min-width:0;flex:1"><div class="label">${esc(r.label||t.executor)} · ${esc((((t.status==="running"&&t.run?.model)?t.run.model:(t.attempts?.length?t.attempts[t.attempts.length-1].executor:t.run?.model))||"").split(":")[1]||t.model||st.mission.executor_model||r.model||"")}</div><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.id} · ${esc(t.title)}</div></div>${statusPill(t.status)}</div>
+      ${isLive?`<div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span class="mono muted">› ${esc(t.step||"…")}</span><b class="mono" style="color:var(--cyan)">${t.progress||0}%</b></div><div class="bar"><i style="width:${t.progress||0}%"></i></div></div>`:""}
+      <div class="term" id="term-${t.id}"><div class="k-system">connecting to session…</div></div>
+      <div class="nums"><span>attempt <b>${t.run?.attempt||t.attempts?.length||1}</b></span><span>${isLive?"elapsed":"took"} <b>${dur(t.run?.started,isLive?null:t.run?.finished)}</b></span><span>tokens <b>${fmt(tokIn(tk)+(tk.output||0))}</b></span><span>cost <b>${money(tk.cost_usd)}</b></span></div>
+    </div>`; };
+  const used={}; st.tasks.forEach(t=>(t.attempts||[]).forEach(a=>{ const k=String(a.executor).split(":")[0]; used[k]=(used[k]||0)+1; }));
+  return head("Agents", live.length? `${live.length} executor session${live.length>1?"s":""} live. Each task runs in its own fresh chat.` : "No executors running right now.")
+    + (live.length?`<div class="agents">${live.map(t=>card(t,true)).join("")}</div>`:`<div class="empty">No live executors. Press <b>Run Ready</b> or turn on <b>Autopilot</b>.</div>`)
+    + (recent.length?`<div class="label" style="margin:28px 0 12px">Recently finished</div><div class="agents">${recent.map(t=>card(t,false)).join("")}</div>`:"")
+    + `${(()=>{ const ppl=st.tasks.filter(t=>t.executor==="human"&&["running","review","blocked"].includes(t.status)); return ppl.length?`<div class="label" style="margin:28px 0 12px">With teammates</div><div class="agents">${ppl.map(t=>`<div class="panel agent" data-task="${t.id}" style="cursor:pointer"><div class="agent-h">${avatar(t.assignee,40)}<div style="min-width:0;flex:1"><div class="label">@${esc(t.assignee)}</div><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.id} · ${esc(t.title)}</div></div>${statusPill(t.status)}</div><div class="muted" style="font-size:13px">${esc(t.step||"")} · ${ago(t.run?.started)} ago</div></div>`).join("")}</div>`:""; })()}<div class="label" style="margin:26px 0 0">Executor roster · supervisor: ${st.supervisor?.mode==="dashboard"?esc(supLabel())+" (dashboard)":"your external chat"}</div><div class="roster">${Object.entries(st.runners).filter(([k,r])=>r.role!=="supervisor").map(([k,r])=>`<span class="tag">${esc(r.label)} <span class="muted">· ${used[k]||0} runs</span></span>`).join("")}</div>`;
+}
+async function fetchLog(tid, attempt){
+  const key=tid+"#"+attempt, L=S.logs[key] ||= {offset:0, lines:[]};
+  const r=await api(`/api/log?p=${encodeURIComponent(S.cur)}&t=${tid}&a=${attempt}&o=${L.offset}`);
+  if(r.offset<L.offset){ L.lines=[]; }
+  L.lines.push(...r.lines); L.offset=r.offset; if(L.lines.length>1500) L.lines.splice(0,L.lines.length-1500);
+  return L;
+}
+async function hydrateTerms(){
+  for(const t of S.st.tasks){ const el=$("term-"+t.id); if(!el) continue;
+    const a=t.run?.attempt||t.attempts?.length; if(!a){ el.innerHTML='<div class="muted">no session yet</div>'; continue; }
+    try{ const L=await fetchLog(t.id,a); el.innerHTML=L.lines.slice(-7).map(l=>`<div class="k-${l.kind}">${l.kind==="tool"?"▸ ":""}${esc(l.text.split("\n")[0])}</div>`).join("")||'<div class="muted">waiting for output…</div>'; }catch(e){}
+  }
+}
+setInterval(()=>{ if(S.view==="agents"&&S.st) hydrateTerms(); }, 1500);
+
+/* ── usage ── */
+S.usage=null; S.fleet=null; S.usageScope="project"; S.usageFilter="all"; S.usageOpen=new Set(); S.usageCalls={};
+const insideTok=r=>(r.input||0)+(r.cache_read||0)+(r.cache_write||0);
+const fdur=s=>s==null?"–":s<60?Math.round(s)+"s":Math.floor(s/60)+"m "+Math.round(s%60)+"s";
+const costFmt=n=>!n?"$0":n<0.01?"$"+n.toFixed(4):money(n);
+async function loadUsage(){
+  try{
+    if(S.usageScope==="fleet"){ S.fleet=await api("/api/usage-fleet"); }
+    else if(S.cur){ const u=await api("/api/usage?p="+encodeURIComponent(S.cur)); u.project=S.cur; S.usage=u; }
+  }catch(e){}
+}
+function rowWho(r,titles){ return r.kind==="supervisor" ? `Supervisor · turn ${r.turn}` : `${r.task} · attempt ${r.attempt}${titles[r.task]?` <span class="muted">· ${esc(trunc(titles[r.task],34))}</span>`:""}`; }
+function usageChart(rows){
+  const days={}; rows.forEach(r=>{ const d=(r.ts||"").slice(0,10); if(!d) return; const o=days[d]||={sup:0,exe:0}; o[r.kind==="supervisor"?"sup":"exe"]+=r.cost_usd||0; });
+  const keys=Object.keys(days).sort().slice(-14); if(!keys.length) return "";
+  const max=Math.max(...keys.map(k=>days[k].sup+days[k].exe),0.0001), W=Math.max(300,Math.min(900,keys.length*58)), H=150, bw=Math.min(36,(W-20)/keys.length-10);
+  let svg=`<svg viewBox="0 0 ${W} ${H+34}" width="100%" style="max-width:${W}px" role="img" aria-label="Cost per day">`;
+  keys.forEach((k,i)=>{ const x=10+i*((W-20)/keys.length)+((W-20)/keys.length-bw)/2, he=days[k].exe/max*H, hs=days[k].sup/max*H, tot=days[k].sup+days[k].exe;
+    svg+=`<rect x="${x}" y="${H-he}" width="${bw}" height="${he}" rx="4" style="fill:var(--blue)"><title>${k} executors ${costFmt(days[k].exe)}</title></rect>
+      <rect x="${x}" y="${H-he-hs}" width="${bw}" height="${hs}" rx="4" style="fill:var(--purple)"><title>${k} supervisor ${costFmt(days[k].sup)}</title></rect>
+      <text x="${x+bw/2}" y="${H-he-hs-6}" text-anchor="middle" font-size="11" style="fill:var(--mute)">${costFmt(tot)}</text>
+      <text x="${x+bw/2}" y="${H+18}" text-anchor="middle" font-size="11" style="fill:var(--dim)">${new Date(k+"T12:00:00").toLocaleDateString([], {month:"short",day:"numeric"})}</text>`; });
+  return svg+`</svg><div class="legend"><span><i style="background:var(--blue)"></i>Executors</span><span><i style="background:var(--purple)"></i>Supervisor</span></div>`;
+}
+function callsTable(r){
+  if(r.backfilled||!r.n_calls) return `<div class="muted" style="padding:10px 16px;font-size:12.5px">No per-call detail: this ran before turn tracking was added.</div>`;
+  const calls=S.usageCalls[r.id]; if(!calls) return `<div class="muted" style="padding:10px 16px;font-size:12.5px">Loading…</div>`;
+  const max=Math.max(...calls.map(c=>c.cost||0),0.0000001);
+  return `<table class="att" style="margin:4px 0 10px"><tr><th>#</th><th>At</th><th>What it did</th><th style="text-align:right">Input side</th><th style="text-align:right">Output</th><th style="text-align:right">Cost</th><th></th></tr>`+
+    calls.map(c=>`<tr><td>${c.n}</td><td>${fdur(c.t)}</td><td>${esc(trunc(c.tool||"thinking / answer",60))}</td><td style="text-align:right" title="fresh ${c.in} · cache read ${c.read} · cache write ${c.write}">${fmt(c.in+c.read+c.write)}</td><td style="text-align:right">${fmt(c.out)}</td><td style="text-align:right">${costFmt(c.cost)}</td><td style="width:90px"><div class="bar"><i style="width:${(c.cost||0)/max*100}%"></i></div></td></tr>`).join("")+
+    `</table><div class="muted" style="font-size:11.5px;padding:0 16px 10px">Input-side tokens per call are exact. Output and cost per call are the exact run totals split by token weight.</div>`;
+}
+function viewTokens(){
+  const scopeBtns=`<div class="filters" style="margin:0"><button class="${S.usageScope==="project"?"on":""}" data-uscope="project">This project</button><button class="${S.usageScope==="fleet"?"on":""}" data-uscope="fleet">All projects</button></div>`;
+  if(S.usageScope==="fleet"){
+    const F=S.fleet; if(!F) return head("Usage","Loading…",scopeBtns);
+    const tot=F.reduce((a,p)=>a+p.cost,0), max=Math.max(...F.map(p=>p.cost),0.0001);
+    return head("Usage","Spend across every project on this dashboard.",scopeBtns)
+      +`<div class="kpis"><div class="panel kpi"><div class="label">Total spend</div><div class="v">${costFmt(tot)}</div><div class="s">${F.length} projects</div></div>
+        <div class="panel kpi"><div class="label">Supervisors</div><div class="v" style="color:var(--purple)">${costFmt(F.reduce((a,p)=>a+p.sup_cost,0))}</div><div class="s">${F.reduce((a,p)=>a+p.turns,0)} turns</div></div>
+        <div class="panel kpi"><div class="label">Executors</div><div class="v" style="color:var(--blue)">${costFmt(F.reduce((a,p)=>a+p.exec_cost,0))}</div><div class="s">${F.reduce((a,p)=>a+p.runs,0)} runs</div></div></div>`
+      +`<div class="panel" style="overflow:hidden"><table class="att ulist"><tr><th>Project</th><th style="text-align:right">Supervisor</th><th style="text-align:right">Executors</th><th style="text-align:right">Total</th><th style="width:22%"></th><th style="text-align:right">Tokens (in / out)</th><th style="text-align:right">Last activity</th></tr>`+
+      [...F].sort((a,b)=>b.cost-a.cost).map(p=>`<tr class="clk" data-uproj="${esc(p.path)}"><td><b>${esc(p.name)}</b></td><td style="text-align:right">${costFmt(p.sup_cost)}</td><td style="text-align:right">${costFmt(p.exec_cost)}</td><td style="text-align:right"><b>${costFmt(p.cost)}</b></td><td><div class="bar"><i style="width:${p.cost/max*100}%"></i></div></td><td style="text-align:right">${fmt(p.in)} / ${fmt(p.out)}</td><td style="text-align:right" class="muted">${p.last?ago(p.last)+" ago":"–"}</td></tr>`).join("")+`</table></div>`;
+  }
+  const st=S.st, U=S.usage; if(!st) return head("Usage","",scopeBtns)+noMission();
+  if(!U||U.project!==S.cur) return head("Usage","Loading…",scopeBtns);
+  const rows=U.rows, titles=U.titles, tot=rows.reduce((a,r)=>a+(r.cost_usd||0),0), sup=rows.filter(r=>r.kind==="supervisor"), exe=rows.filter(r=>r.kind==="executor");
+  const sc=sup.reduce((a,r)=>a+(r.cost_usd||0),0), ec=exe.reduce((a,r)=>a+(r.cost_usd||0),0);
+  const sumTok=k=>rows.reduce((a,r)=>a+(r[k]||0),0), inside=rows.reduce((a,r)=>a+insideTok(r),0), cr=sumTok("cache_read");
+  // per task
+  const byTask={}; exe.forEach(r=>{ const o=byTask[r.task]||={task:r.task,runs:0,cost:0,tin:0,out:0,models:new Set(),denied:0,ok:false}; o.runs++; o.cost+=r.cost_usd||0; o.tin+=insideTok(r); o.out+=r.output||0; if(r.model) o.models.add(String(r.model).replace("claude:","")); o.denied+=r.denied?1:0; });
+  const tasks=Object.values(byTask).sort((a,b)=>b.cost-a.cost), tmax=Math.max(sc,...tasks.map(t=>t.cost),0.0001);
+  const supAvg=sup.length?sc/sup.length:0, exeAvg=exe.length?ec/exe.length:0;
+  const f=S.usageFilter, shown=[...rows].reverse().filter(r=>f==="all"||(f==="supervisor"&&r.kind==="supervisor")||(f==="executor"&&r.kind==="executor")||(f==="retries"&&r.kind==="executor"&&r.attempt>1)||(f.startsWith("T-")&&r.task===f));
+  const ledger=shown.slice(0,300).map(r=>{ const open=S.usageOpen.has(r.id); const sup_=r.kind==="supervisor";
+    return `<tr class="clk ${open?"open":""}" data-uopen="${esc(r.id)}"><td class="muted">${new Date(r.ts).toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit",hourCycle:"h23"})}</td>
+      <td>${rowWho(r,titles)}${sup_&&r.trigger?`<div class="muted" style="font-size:11.5px">${esc(trunc(r.trigger,70))}</div>`:""}${!sup_&&r.denied?`<div class="muted" style="font-size:11.5px;color:var(--orange)">${r.denied} permission denial${r.denied>1?"s":""}</div>`:""}</td>
+      <td>${esc(String(r.model||"").replace("claude:",""))}${r.effort?` <span class="muted">· ${esc(r.effort)}</span>`:""}</td><td style="text-align:right">${fdur(r.duration_s)}</td>
+      <td style="text-align:right" title="fresh ${r.input} · cache read ${r.cache_read||0} · cache write ${r.cache_write||0}">${r.input!=null?fmt(insideTok(r)):"–"} / ${r.output!=null?fmt(r.output):"–"}</td><td style="text-align:right"><b>${costFmt(r.cost_usd)}</b></td><td class="muted" style="width:18px">${open?"▾":"▸"}</td></tr>
+      ${open?`<tr class="detail"><td colspan="7">${callsTable(r)}</td></tr>`:""}`; }).join("");
+  const chips=["all","supervisor","executor","retries",...tasks.map(t=>t.task).sort()].map(k=>`<button class="${f===k?"on":""}" data-ufilter="${k}">${k==="all"?"All runs":k==="executor"?"Executors":k==="retries"?"Retries":k==="supervisor"?"Supervisor":k}</button>`).join("");
+  return head("Usage",`Every turn and run in this project. Costs are exact from the CLI. The supervisor is ${sc>ec?"the larger":"the smaller"} share (${tot?Math.round(sc/tot*100):0}%).`,
+      `<div class="gstats">${scopeBtns}<a class="btn sm" href="/api/usage.csv?p=${encodeURIComponent(S.cur)}" download="usage-${esc(st.mission.name||"mission")}.csv">Export CSV</a></div>`)
+   +`<div class="kpis">
+      <div class="panel kpi"><div class="label">Total cost</div><div class="v">${costFmt(tot)}</div><div class="s">${rows.length} run${rows.length===1?"":"s"} and turns</div></div>
+      <div class="panel kpi"><div class="label">Supervisor</div><div class="v" style="color:var(--purple)">${costFmt(sc)}</div><div class="s">${sup.length} turn${sup.length===1?"":"s"} · avg ${costFmt(supAvg)}</div></div>
+      <div class="panel kpi"><div class="label">Executors</div><div class="v" style="color:var(--blue)">${costFmt(ec)}</div><div class="s">${exe.length} run${exe.length===1?"":"s"} · avg ${costFmt(exeAvg)}</div></div>
+      <div class="panel kpi"><div class="label">Tokens</div><div class="v">${fmt(inside)}</div><div class="s">${fmt(sumTok("output"))} output · ${inside?Math.round(cr/inside*100):0}% from cache</div></div></div>`
+   +(usageChart(rows)?`<div class="panel" style="padding:18px;margin-bottom:16px"><div class="label" style="margin-bottom:8px">Cost per day</div>${usageChart(rows)}</div>`:"")
+   +`<div class="label" style="margin:22px 0 10px">By task</div><div class="panel" style="overflow:hidden"><table class="att ulist"><tr><th>Task</th><th style="text-align:right">Runs</th><th style="text-align:right">Input side</th><th style="text-align:right">Output</th><th style="text-align:right">Cost</th><th style="width:24%"></th><th>Models</th></tr>
+      <tr class="clk" data-ufilter="supervisor"><td><b>Supervisor</b> <span class="muted">· all turns</span></td><td style="text-align:right">${sup.length}</td><td style="text-align:right">${fmt(sup.reduce((a,r)=>a+insideTok(r),0))}</td><td style="text-align:right">${fmt(sup.reduce((a,r)=>a+(r.output||0),0))}</td><td style="text-align:right"><b>${costFmt(sc)}</b></td><td><div class="bar"><i style="width:${sc/tmax*100}%;background:var(--purple)"></i></div></td><td class="muted">${esc([...new Set(sup.map(r=>String(r.model||"").replace("claude:","")))].join(", "))}</td></tr>`+
+      tasks.map(t=>`<tr class="clk" data-ufilter="${t.task}"><td><span class="mono" style="color:var(--blue)">${t.task}</span> ${esc(trunc(titles[t.task]||"",38))}</td><td style="text-align:right">${t.runs}${t.runs>1?` <span class="muted" title="retries">↻</span>`:""}</td><td style="text-align:right">${fmt(t.tin)}</td><td style="text-align:right">${fmt(t.out)}</td><td style="text-align:right"><b>${costFmt(t.cost)}</b></td><td><div class="bar"><i style="width:${t.cost/tmax*100}%"></i></div></td><td class="muted">${esc([...t.models].join(", "))}</td></tr>`).join("")+`</table></div>`
+   +`<div style="display:flex;align-items:center;gap:12px;margin:26px 0 10px;flex-wrap:wrap"><div class="label">Every run and turn</div><div class="filters" style="margin:0;flex-wrap:wrap">${chips}</div></div>
+      <div class="panel" style="overflow:hidden"><table class="att ulist"><tr><th>When</th><th>Who</th><th>Model</th><th style="text-align:right">Time</th><th style="text-align:right" title="input side (fresh + cache) / output">Tokens in / out</th><th style="text-align:right">Cost</th><th></th></tr>${ledger||`<tr><td colspan="7" class="muted" style="padding:20px;text-align:center">Nothing here yet.</td></tr>`}</table></div>
+      ${shown.length>300?`<div class="muted" style="font-size:12px;margin-top:8px">Showing the latest 300 of ${shown.length}. Export the CSV for everything.</div>`:""}`;
+}
+
+/* ── feed ── */
+function viewFeed(){
+  const st=S.st; if(!st) return head("Activity","")+noMission();
+  const groups={all:null, work:["run_started","report","check","approved","changes"], comms:["question","answer","note","decision"], issues:["error","stopped","cancelled"]};
+  const f=groups[S.feedFilter], evs=[...st.events].reverse().filter(e=>!f||f.includes(e.kind)).slice(0,250);
+  return head("Activity","Live event stream for this mission") + `<div class="filters">${Object.keys(groups).map(k=>`<button class="${S.feedFilter===k?"on":""}" data-filter="${k}">${k}</button>`).join("")}</div>
+   <div class="panel feed">${evs.map(e=>{ const [ic,c]=EVI[e.kind]||["•","var(--mute)"]; return `<div class="ev" ${e.task?`data-task="${e.task}" style="cursor:pointer"`:""}><time>${clock(e.ts)}</time><span class="ic" style="color:${c}">${ic}</span><div><span class="who">${esc(e.actor)}</span>${esc(e.msg)}</div></div>`; }).join("")||'<div class="empty" style="border:none">Nothing yet.</div>'}</div>`;
+}
+
+/* ── comms: supervisor chat ── */
+function supLabel(){ const sp=S.st.supervisor||{}, r=S.st.runners[sp.runner||"claude-supervisor"]; return (r?r.label.replace(" (untested template)",""):"supervisor")+" · "+(sp.model||r?.model||"default"); }
+function riskPill(l){ return `<span class="risk ${l}">${l==="low"?"Low":l==="high"?"High":"Medium"} risk</span>`; }
+function permRows(list,checks){
+  return `<div class="pc-list">${list.map(p=>`<div class="pr"><div class="pr-top"><label>${checks?`<input type="checkbox" class="pp-chk" data-rule="${esc(p.rule)}" checked>`:""}${esc(p.label)}</label>${riskPill(p.level)}</div>
+    <code>${esc(p.rule)}</code>${p.why?`<div class="muted" style="font-size:12px">${esc(p.why)}</div>`:""}<div class="pr-risk">${esc(p.risk)}</div></div>`).join("")}</div>`;
+}
+function approveBanner(){
+  const st=S.st; if(st?.mission.phase!=="awaiting_approval") return "";
+  const n=st.tasks.filter(t=>t.status!=="cancelled").length, ph=new Set(st.tasks.map(t=>t.phase)).size, pp=st.plan_permissions||[];
+  return `<div class="panel approve"><div><div class="label" style="color:var(--cyan)">Plan ready for launch</div>
+    <div style="font-size:15px;font-weight:600;margin-top:4px">${n} tasks · ${ph} phase${ph>1?"s":""} · nothing runs until you approve</div>
+    <div class="muted" style="font-size:12.5px">Check the timeline in <a href="#" data-view="phases">Phases</a>. Want changes? Just tell the supervisor in chat.</div></div>
+    <button class="btn primary launch" id="approveBtn">✓ ${pp.length?"Approve, allow & launch":"Approve & launch"}</button>
+    ${pp.length?`<div class="approve-perms"><div class="label">This plan needs ${pp.length} permission${pp.length>1?"s":""} · untick any you don't want to give</div>${permRows(pp,true)}</div>`:""}</div>`;
+}
+function permCard(q){
+  const info=q.perm_info||q.permission.map(r=>({rule:r,label:r,level:"medium",risk:""}));
+  const title=q.task?`${esc(q.task)} needs permission`:q.from==="system"?"Your supervisor needs permission":"Permission needed";
+  return `<div class="panel qcard urgent pcard"><div class="pc-head"><div><div class="pc-title">${title}</div>${q.why?`<div class="pc-sub">${esc(q.why)}</div>`:""}</div><span class="mono muted" style="font-size:11px;white-space:nowrap">${ago(q.created)} ago</span></div>
+    ${permRows(info,false)}
+    <div class="pc-actions"><button class="btn primary" data-answer="${esc(q.id)}" data-val="Allow">Allow</button><button class="btn" data-answer="${esc(q.id)}" data-val="Don't allow">Don't allow</button></div>
+    <details class="pc-reply"><summary>Reply with something else</summary><textarea id="ans-${esc(q.id)}" data-draft="ans-${esc(q.id)}" placeholder="Write your own answer…">${esc(S.drafts["ans-"+q.id]||"")}</textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn primary sm" data-answer-text="${esc(q.id)}">Send answer</button></div></details></div>`;
+}
+function permPanel(){
+  const allow=S.st.mission.permissions?.allow||[];
+  return `<div class="panel qcard"><div class="label">Permissions for this project</div>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px">Executors and the supervisor can only run what's allowed. By default that's editing files, tests and builds. When something is blocked, your supervisor asks you here before anything is granted.</p>
+    ${allow.length?`<div class="rules">${allow.map(r=>`<span class="rule"><code>${esc(r)}</code><button class="x2" data-rmperm="${esc(r)}" aria-label="Remove ${esc(r)}">×</button></span>`).join("")}</div>`:`<div class="muted" style="font-size:12.5px;margin-bottom:8px">Nothing extra allowed yet.</div>`}
+    <div style="display:flex;gap:8px"><input class="inp" id="permRule" data-draft="permRule" placeholder="Bash(~/venvs/env/bin/python *)  or  WebSearch" value="${esc(S.drafts.permRule||"")}"><button class="btn sm primary" id="addPerm">Allow</button></div></div>`;
+}
+function condText(c){ return c.file?`${esc(c.file)} appears`:c.contains?`${esc(c.contains[0])} contains “${esc(c.contains[1])}”`:`no process matching “${esc(c.gone)}” is running`; }
+function watchPanel(){
+  const ws=S.st.watches||[]; if(!ws.length) return "";
+  const act=ws.filter(w=>w.status==="active"), done=ws.filter(w=>w.status==="fired").sort((a,b)=>(b.fired_at||"").localeCompare(a.fired_at||"")).slice(0,3);
+  const left=w=>{ const h=(ts(w.expires)-Date.now())/3600000; return h>=1?Math.round(h)+"h":Math.max(1,Math.round(h*60))+"m"; };
+  return `<div class="panel qcard"><div class="label">Waiting for${act.length?` <span style="color:var(--blue)">· ${act.length}</span>`:""}</div>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 8px">Your supervisor is waiting on these without using any tokens. It's woken the moment one is met.</p>
+    ${act.map(w=>`<div class="wrow"><div style="min-width:0;flex:1"><div style="font-weight:600;font-size:13.5px">${esc(w.name)}${w.task?` <span class="muted mono" style="font-size:11.5px">${esc(w.task)}</span>`:""}</div>
+      <div class="muted" style="font-size:12px">Until ${w.until.map(condText).join(" and ")}${(w.fail?.length||w.fail_if_gone?.length)?" · or it fails":""}</div>
+      <div class="muted" style="font-size:11.5px">${w.last_check?"checked "+ago(w.last_check)+" ago":"not checked yet"} · every ${w.every}s · gives up in ${left(w)}</div></div>
+      <button class="x2" data-wcancel="${esc(w.id)}" aria-label="Stop waiting for ${esc(w.name)}" title="Stop waiting">×</button></div>`).join("")}
+    ${done.map(w=>`<div class="wrow done"><span style="color:${w.reason==="done"?"var(--green)":"var(--orange)"}">${w.reason==="done"?"✓":"⚠"}</span><div style="flex:1"><span>${esc(w.name)}</span> <span class="muted" style="font-size:12px">· ${w.reason==="done"?"ready":w.reason==="failed"?"failed":"timed out"} ${ago(w.fired_at)} ago</span></div></div>`).join("")}</div>`;
+}
+function limitsPanel(){
+  const mi=S.st.mission, sup=S.st.supervisor||{};
+  const sel=(id,label,hint,cur,opts,fmtOpt)=>{ const all=[...new Set([...opts,cur].filter(x=>x!==undefined&&x!==null))].sort((a,b)=>(a===0?-1:b===0?1:a-b));
+    return `<div class="lrow"><div><div style="font-weight:500;font-size:13.5px">${label}</div><div class="muted" style="font-size:12px">${hint}</div></div><select class="sel" id="${id}" data-limit="${id}" aria-label="${label}">${all.map(v=>`<option value="${v}" ${String(v)===String(cur)?"selected":""}>${fmtOpt(v)}</option>`).join("")}</select></div>`; };
+  return `<div class="panel qcard"><div class="label">Safety limits</div>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px">So nothing loops or runs away with your money. When a limit stops something, you're asked what to do.</p>
+    ${sel("lim-att","Attempts per task","After this many tries, nothing retries it until you allow more.",mi.max_attempts||3,[1,2,3,4,5,6,8,10],v=>v+(v==1?" attempt":" attempts"))}
+    ${sel("lim-bud","Budget per executor run","A run stops once it has spent this much.",mi.executor_budget_usd||0,[0,.10,.25,.50,1,2,5],v=>v?"$"+v:"No cap")}
+    ${sel("lim-calls","Model calls per executor run","A run is stopped after this many steps.",mi.executor_max_turns||0,[0,10,20,30,50,80,120],v=>v?v+" calls":"No cap")}
+    ${sup.mode==="dashboard"?sel("lim-sup","Supervisor turns without you","It pauses after this many turns in a row.",sup.max_auto_turns||40,[10,20,40,80,160],v=>v+" turns"):""}</div>`;
+}
+function viewComms(){
+  const st=S.st; if(!st) return head("Chat","")+noMission();
+  const sp=st.supervisor||{}, dash=sp.mode==="dashboard", Q=st.questions;
+  const mine=Q.filter(q=>q.to==="user"&&q.status==="open"), chain=Q.filter(q=>q.to==="supervisor").reverse();
+  const msgs=st.chat.map(c=>{
+    if(c.role==="system") return `<div class="msg sys">${esc(c.text)}</div>`;
+    const me=c.role==="user";
+    return `<div class="msg ${me?"me":"sup"}"><div class="who">${me?"You":"Supervisor"} <span>${clock(c.ts)}${!me&&c.cost?` · ${money(c.cost)}`:""}${me&&!c.delivered&&dash?" · queued":""}</span></div><div class="${me?"":"md-lite"}">${me?esc(c.text).replace(/\n/g,"<br>"):md(c.text)}</div></div>`;
+  }).join("");
+  const typing = sp.running ? `<div class="msg sup typing"><div class="who">Supervisor <span>${esc(sp.step||"thinking")}</span></div><div class="dots"><i></i><i></i><i></i></div></div>` : "";
+  const intro = !st.chat.length ? `<div class="msg sys">${dash?"Your supervisor will appear here. Tell it what you want to build.":"This mission's supervisor runs in an external chat (e.g. Claude Code). Messages you send here are delivered to it as notes."}</div>` : "";
+  return head("Chat", dash?`Talk to your supervisor (${esc(supLabel())}). It plans, delegates and reviews. Executors never talk to you.`:"Supervisor runs in an external chat. Messages here are delivered as notes.",
+      `<div class="gstats">${dash?`${S.st.resume_cmd?`<button class="btn sm" id="ccCopy" title="Copies a command that opens this supervisor chat in Claude Code. Run it in a terminal.">Open in Claude Code</button>`:""}<button class="btn sm" id="supReset" title="Start a fresh supervisor session from the mission state (saves tokens)">↻ Fresh session</button>`:`<button class="btn sm" id="supTake" title="Let the dashboard run the supervisor">Run supervisor here</button>`}</div>`)
+   + approveBanner() + prBanner()
+   + `<div class="comms"><div class="panel chat"><div class="chat-log" id="chatlog">${intro}${msgs}${typing}</div>
+        <div class="composer"><textarea id="chat-box" data-draft="chat" placeholder="${st.mission.phase==="briefing"?"Describe what you want to build, who it's for, and what done looks like…":"Message your supervisor"}">${esc(S.drafts.chat||"")}</textarea>
+        <button class="btn primary" id="sendChat">Send ➤</button></div></div>
+      <div>
+      ${mine.length?`<div class="label" style="margin-bottom:10px">Decisions waiting on you <span style="color:var(--magenta)">· ${mine.length}</span></div>`:""}
+      ${mine.map(q=>q.permission?permCard(q):`<div class="panel qcard urgent">
+        <div class="mono muted" style="font-size:11px">${q.id}${q.task?" · "+q.task:""} · ${ago(q.created)} ago</div><h4>${esc(q.question)}</h4>
+        ${q.options?.length?`<div class="opts">${q.options.map(o=>`<button class="opt ${o===q.recommendation?"rec":""}" data-answer="${esc(q.id)}" data-val="${esc(o)}">${esc(o)}</button>`).join("")}</div>`:""}
+        <textarea id="ans-${esc(q.id)}" data-draft="ans-${esc(q.id)}" placeholder="Or write your own answer…">${esc(S.drafts["ans-"+q.id]||"")}</textarea>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn primary sm" data-answer-text="${esc(q.id)}">Send answer</button></div></div>`).join("")}
+            ${watchPanel()}
+      ${permPanel()}
+      ${limitsPanel()}
+      <div class="panel qcard"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div class="label">Models and effort</div><button class="btn sm primary" id="saveModels">Save</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 12px"><b>Effort</b> is how hard the model thinks before answering. Higher is more thorough on hard problems but slower and costlier. Lower is fine for routine tasks.</p>
+        ${modelPicker("md-", st.runners, {sr:sp.runner||"claude-supervisor", sm:sp.model||"", se:sp.effort||"", er:st.mission.default_executor||"claude", em:st.mission.executor_model||"", ee:st.mission.executor_effort||""})}</div>
+<div class="label" style="margin-bottom:10px">Executor questions</div>
+      <div class="panel qscroll" id="qscroll">${chain.map(q=>`<div class="thread" data-task="${esc(q.task||"")}" style="cursor:pointer"><div class="mono muted" style="font-size:11px">${q.id} · ${ago(q.created)} ago · ${q.status==="open"?'<span style="color:var(--magenta)">waiting for supervisor</span>':'<span style="color:var(--lime)">answered</span>'}</div>
+        <div class="bubble q"><small>${esc(q.from)} (executor)</small>${esc(q.question)}</div>
+        ${q.status==="answered"?`<div class="bubble a"><small>${esc(q.answered_by==="user"?"You":"Supervisor")}</small>${esc(q.answer)}</div>`:""}</div>`).join("")||'<div class="thread muted">No executor questions yet.</div>'}</div>
+      </div></div>`;
+}
+
+
+/* ── model picker ── */
+const EFFORT_LABELS={low:"low · fastest, cheapest",medium:"medium",high:"high",xhigh:"extra high",max:"max · most thorough"};
+/* list prices, $ per million tokens (input / output), as of Oct 2026 */
+const MODEL_INFO={
+  "claude-haiku-5-5":{label:"Haiku 5.5",in:.10,out:.50,note:"Cheapest. Routine edits, extraction, simple scripts."},
+  "claude-haiku-4-5":{label:"Haiku 4.5",in:1,out:5,note:"Older and pricier than Haiku 5.5. Rarely the right pick."},
+  "claude-sonnet-5-5":{label:"Sonnet 5.5",in:2,out:10,note:"Balanced. Most coding and analysis work."},
+  "claude-sonnet-5":{label:"Sonnet 5",in:2,out:10,note:"Previous Sonnet. Prefer 5.5."},
+  "claude-opus-5-5":{label:"Opus 5.5",in:4,out:20,note:"Strongest everyday model. Hard reasoning, planning, tricky debugging."},
+  "claude-opus-5":{label:"Opus 5",in:5,out:25,note:"Previous Opus. Prefer 5.5."},
+  "claude-fable-5-1":{label:"Fable 5.1",in:10,out:50,note:"Most capable and most expensive. Only for the hardest problems."},
+  "haiku":{label:"haiku (alias)",in:.10,out:.50,alias:1,note:"Alias: follows the newest Haiku the CLI knows."},
+  "sonnet":{label:"sonnet (alias)",in:2,out:10,alias:1,note:"Alias: follows the newest Sonnet the CLI knows."},
+  "opus":{label:"opus (alias)",in:4,out:20,alias:1,note:"Alias: follows the newest Opus the CLI knows."},
+  "fable":{label:"fable (alias)",in:10,out:50,alias:1,note:"Alias: follows the newest Fable the CLI knows."}};
+const usd=n=>"$"+(n<1?n.toFixed(2):n%1?n.toFixed(2):String(n));
+const modelOpt=x=>{ const i=MODEL_INFO[x]; return i?`${i.label} · ${usd(i.in)} / ${usd(i.out)}`:x; };
+function modelHint(val, defaultModel){
+  const id=val||defaultModel, i=MODEL_INFO[id]; if(val==="__custom") return "Price unknown. Check your provider's pricing.";
+  if(!i) return id?`${esc(id)}: price unknown here.`:"";
+  const cheapest=.10, x=i.in/cheapest;
+  return `<b>${usd(i.in)}</b> in / <b>${usd(i.out)}</b> out per million tokens${x>1.01?` · <b>${x>=10?Math.round(x):x.toFixed(0)}×</b> Haiku 5.5`:" · the cheapest"}. ${i.note}`;
+}
+function modelPicker(pre, runners, cur){
+  const d=k=>S.drafts[pre+k], rows=[["sr","sm","se","supervisor","Supervisor","expensive · plans, reviews, talks to you"],["er","em","ee","executor","Executors","cheap · do the tasks, one fresh session each"]];
+  return `<div class="picker">${rows.map(([rk,mk,ek,role,title,sub])=>{ const rv=d(rk)??cur[rk], mv=d(mk)??cur[mk]??"", ev=d(ek)??cur[ek]??"", rr=runners[rv]||{}, list=rr.models||[], effs=rr.efforts||[];
+     const known=mv===""||list.includes(mv), custom=!known||mv==="__custom";
+     return `<div class="prow"><div><div class="label">${title}</div><div class="muted" style="font-size:11.5px">${sub}</div></div>
+      <select class="sel" id="${pre}${rk}" data-draft="${pre}${rk}" data-pick="${pre}${mk}">${Object.entries(runners).filter(([k,r])=>r.role===role).map(([k,r])=>`<option value="${k}" ${k===rv?"selected":""}>${esc(r.label)}${r.installed?"":" · not installed"}</option>`).join("")}</select>
+      <div class="mcell"><select class="sel" id="${pre}${mk}" data-draft="${pre}${mk}" aria-label="${title} model">
+        <option value="" ${mv===""?"selected":""}>Default${rr.model?" ("+esc(rr.model)+")":""}${MODEL_INFO[rr.model]?" · "+usd(MODEL_INFO[rr.model].in)+" / "+usd(MODEL_INFO[rr.model].out):""}</option>
+        ${list.map(x=>`<option value="${esc(x)}" ${x===mv?"selected":""}>${esc(modelOpt(x))}</option>`).join("")}
+        <option value="__custom" ${custom?"selected":""}>Other model…</option></select>
+        ${effs.length?`<select class="sel" id="${pre}${ek}" data-draft="${pre}${ek}" aria-label="${title} effort" title="How hard the model thinks before answering. Higher is better on hard tasks, and costs more."><option value="" ${ev===""?"selected":""}>Effort: default</option>${effs.map(x=>`<option value="${x}" ${x===ev?"selected":""}>Effort: ${esc(EFFORT_LABELS[x]||x)}</option>`).join("")}</select>`:""}
+        <input class="inp" id="${pre}${mk}-x" data-draft="${pre}${mk}-x" placeholder="model name, e.g. gemini-2.5-flash" value="${esc(known?"":mv)}" style="${custom?"":"display:none"}">
+        </div><div class="mhint" id="${pre}${mk}-h" data-default="${esc(rr.model||"")}">${modelHint(custom?"__custom":mv, rr.model)}</div></div>`; }).join("")}
+    ${(()=>{ const price=(rv,mv)=>{ const rr=runners[rv]||{}, i=MODEL_INFO[mv||rr.model]; return i?i.in:null; }; const ps=price(d("sr")??cur.sr, d("sm")??cur.sm), pe=price(d("er")??cur.er, d("em")??cur.em);
+       return (ps!=null&&pe!=null&&pe>ps)?`<div class="warn">Heads up: your executors are set to a pricier model than your supervisor. It's usually the other way round: a strong supervisor and cheap executors.</div>`:""; })()}</div>`;
+}
+function readPicker(pre){ const v=id=>$(pre+id)?.value.trim(), mdl=id=>{ const x=v(id); return x==="__custom"?(v(id+"-x")||""):(x||""); };
+  return {sup_runner:v("sr"), sup_model:mdl("sm"), exec_runner:v("er"), exec_model:mdl("em"), sup_effort:v("se")||"", exec_effort:v("ee")||""}; }
+function savedModels(){ try{ return JSON.parse(lsGet("mc.models")||"null")||{}; }catch(e){ return {}; } }
+
+/* ── ignite splash ── */
+function viewIgnite(p){
+  return `<div class="ignite"><div class="appicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></div>
+    <h1>${esc(p.name)}</h1><p class="muted mono" style="font-size:12px">${esc(p.path)}</p>
+    <p class="pitch">This project isn't under Mission Control yet. Ignite it and your supervisor will scan the project, ask what you want to achieve, and agree a plan with you <b>before anything runs</b>.</p>
+    ${p.files?.length?`<div class="peek">${p.files.map(f=>`<span class="tag">${esc(f)}</span>`).join("")}</div>`:""}
+    <div class="panel" style="width:100%;padding:18px;margin:4px 0 22px;text-align:left">${(()=>{ const sv=savedModels(); return modelPicker("ig-", p.runners||{}, {sr:sv.sup_runner||"claude-supervisor", sm:sv.sup_model||"", se:sv.sup_effort||"", er:sv.exec_runner||"claude", em:sv.exec_model||"", ee:sv.exec_effort||""}); })()}</div>
+    <button class="btn primary ignite-btn" data-ignite="${esc(p.path)}">Ignite Mission Control</button>
+    <div class="muted" style="font-size:12px;margin-top:10px">Creates <code>.mission/</code> in this folder. You can change models any time in Chat.</div></div>`;
+}
+const looksRepo=v=>{ v=(v||"").trim(); return !!v && !/^[\/~.\-]/.test(v) && (/^[\w.-]+\/[\w.-]+$/.test(v) || /^(https?:\/\/|git@|ssh:\/\/)/.test(v)); };
+function addProjectCard(){
+  const v=S.drafts.addPath||"", repo=looksRepo(v);
+  return `<div class="panel pcard addcard"><h3>Add a project</h3><div class="goal">Paste a folder path, or a GitHub repo to clone (<code>owner/name</code> or a link). If it already has <code>.mission/</code> it joins the fleet. Otherwise you can ignite it.</div>
+    <div style="display:flex;gap:8px;margin-top:12px"><input id="addPath" data-draft="addPath" class="inp" placeholder="~/code/my-app   or   owner/repo" value="${esc(v)}" autocomplete="off" spellcheck="false"><button class="btn primary" id="addBtn">${repo?"Clone & Add":"Add"}</button></div>
+    ${repo?`<div class="clone-row"><span class="muted" style="font-size:12.5px;white-space:nowrap">Clone into</span><input id="cloneInto" data-draft="cloneInto" class="inp" placeholder="${esc(S.cloneDir||"~/Documents/GitHub")}" value="${esc(S.drafts.cloneInto||"")}" autocomplete="off" spellcheck="false"></div>`:""}
+    <div id="addErr" class="muted" style="font-size:12.5px;margin-top:8px;color:var(--red)"></div></div>`;
+}
+
+/* ── drawer ── */
+function md(s){
+  const blocks=[]; s=esc(s).replace(/```([\s\S]*?)```/g,(_,c)=>{blocks.push(c);return `\u0000${blocks.length-1}\u0000`;});
+  s=s.split("\n").map(l=>/^#{1,3} /.test(l)?`<h3>${l.replace(/^#+ /,"")}</h3>`:/^\s*[-*] /.test(l)?`<p>• ${l.replace(/^\s*[-*] /,"")}</p>`:l.trim()?`<p>${l}</p>`:"").join("");
+  s=s.replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`]+)`/g,"<code>$1</code>");
+  return s.replace(/\u0000(\d+)\u0000/g,(_,i)=>`<pre>${blocks[i]}</pre>`);
+}
+async function openDrawer(tid){
+  S.drawer=tid; S.logAttempt=null; delete S.hashes.drawer;
+  $("drawer").classList.add("on"); $("scrim").classList.add("on");
+  renderDrawer(); refreshLog();
+}
+function closeDrawer(){ S.drawer=null; $("drawer").classList.remove("on"); $("scrim").classList.remove("on"); }
+async function renderDrawer(){
+  const t=S.st?.tasks.find(x=>x.id===S.drawer); if(!t){ return; }
+  let docs={report:"",feedback:""};
+  try{ docs=await api(`/api/docs?p=${encodeURIComponent(S.cur)}&t=${t.id}`); }catch(e){}
+  const qs=S.st.questions.filter(q=>q.task===t.id);
+  if(!changed("drawer",[t,docs,qs,S.st.ready.includes(t.id),Object.keys(S.st.runners)])) return;
+  const attempts=t.attempts||[], nAtt=Math.max(attempts.length, t.run?.attempt||0);
+  const cur=S.logAttempt||nAtt, tk=t.tokens||{}, ready=S.st.ready.includes(t.id);
+  const by=Object.fromEntries(S.st.tasks.map(x=>[x.id,x]));
+  $("drawer").innerHTML=`
+   <div class="drawer-h"><div style="min-width:0;flex:1"><div class="muted" style="font-size:12px">${t.id} · Phase ${t.phase+1}</div><h2>${esc(t.title)}</h2>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${statusPill(t.status)}
+       <select class="sel" id="execSel" ${t.status==="running"?"disabled":""} aria-label="Assigned to"><optgroup label="AI executors">${Object.entries(S.st.runners).filter(([k,r])=>r.role!=="supervisor").map(([k,r])=>`<option value="${k}" ${k===t.executor?"selected":""}>${esc(r.label)}</option>`).join("")}</optgroup><optgroup label="People">${t.executor==="human"?`<option value="human" selected>@${esc(t.assignee)}</option>`:""}<option value="__person">Assign to a person…</option></optgroup></select>
+       ${t.status==="running"?`<button class="btn sm danger" data-act="stop" data-t="${t.id}">■ Stop</button>`:""}
+       ${["todo","needs_changes"].includes(t.status)?`<button class="btn sm primary" data-act="run" data-t="${t.id}" ${ready?"":`title="Waiting for dependencies" disabled`}>${t.executor==="human"?"Hand Off":"Run"}</button>`:""}
+       ${t.executor==="human"?`<button class="btn sm" id="copyBrief">Copy Brief</button>`:""}
+       ${t.executor==="human"&&t.status==="running"?`<button class="btn sm" id="markDone">Mark Done</button>`:""}
+       ${t.paused?`<button class="btn sm" data-act="resume" data-t="${t.id}">Unpause</button>`:""}
+       ${!["done","cancelled","running"].includes(t.status)?`<button class="btn sm danger" data-act="cancel" data-t="${t.id}">✕ Cancel</button>`:""}
+     </div></div><button class="x" id="closeD" aria-label="Close">✕</button></div>
+   <div class="drawer-b">
+     ${t.status==="running"&&t.executor!=="human"?`<div class="sec"><div style="display:flex;justify-content:space-between"><span class="mono muted">› ${esc(t.step||"…")}</span><b class="mono" style="color:var(--cyan)">${t.progress||0}% · ${dur(t.run?.started)}</b></div><div class="bar"><i style="width:${t.progress||0}%"></i></div></div>`:""}
+     ${t.executor==="human"?`<div class="sec person-box">${avatar(t.assignee,40)}<div style="flex:1;min-width:0"><div style="font-weight:600">@${esc(t.assignee)}</div><div class="muted" style="font-size:12.5px">${esc(t.step||"Not handed off yet")}</div></div>${t.github?.issue_url?`<a class="btn sm" href="${esc(t.github.issue_url)}" target="_blank" rel="noopener">Issue #${t.github.issue} ↗</a>`:""}${t.github?.pr?.url?`<a class="btn sm" href="${esc(t.github.pr.url)}" target="_blank" rel="noopener">PR #${t.github.pr.number} ↗</a>`:""}</div>`:""}
+     <div class="sec"><div class="label">Goal</div><div>${esc(t.goal||"—")}</div></div>
+     ${t.accept?.length?`<div class="sec"><div class="label">Acceptance criteria</div><ul>${t.accept.map(a=>`<li>${esc(a)}</li>`).join("")}</ul></div>`:""}
+     <div class="sec"><div class="label">Wiring</div><div style="display:flex;gap:6px;flex-wrap:wrap">${(t.depends_on||[]).map(d=>`<span class="tag" data-task="${d}" style="cursor:pointer;color:${SCOL(by[d]?.status)}">← ${d}</span>`).join("")||'<span class="muted">no dependencies</span>'}${S.st.tasks.filter(x=>(x.depends_on||[]).includes(t.id)).map(x=>`<span class="tag" data-task="${x.id}" style="cursor:pointer">→ ${x.id}</span>`).join("")}${t.check?`<span class="tag">check: ${esc(t.check)}</span>`:""}${(t.files||[]).map(f=>`<span class="tag">${esc(f)}</span>`).join("")}</div></div>
+     ${t.executor==="human"?"":`<div class="sec"><div class="label">Tokens</div><div class="mono" style="font-size:12.5px">${fmt(tk.input)} in · ${fmt(tk.cache_read)} cache read · ${fmt(tk.cache_write)} cache write · ${fmt(tk.output)} out · <b style="color:var(--lime)">${money(tk.cost_usd)}</b> <span class="muted">(${tk.source||"none"})</span></div></div>`}
+${t.executor==="human"?"":`     <div class="sec"><div style="display:flex;align-items:center;gap:10px"><div class="label">Session transcript</div>${nAtt>1?`<select class="sel" id="attSel">${Array.from({length:nAtt},(_,i)=>`<option value="${i+1}" ${i+1===cur?"selected":""}>attempt ${i+1}</option>`).join("")}</select>`:""}<span class="muted mono" style="font-size:11px;margin-left:auto">read-only · fresh chat per attempt</span></div>
+       <div class="logbox" id="logbox">${nAtt?'<span class="muted">loading…</span>':'<span class="muted">Not run yet.</span>'}</div></div>`}
+     ${docs.report?`<div class="sec"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div class="label">Latest report</div><span class="muted mono" style="font-size:11.5px">.mission/reports/${t.id}.md</span><button class="btn sm" data-reveal="report" style="margin-left:auto">Show in Finder</button></div><div class="md">${md(docs.report)}</div></div>`:""}
+     ${docs.feedback?`<div class="sec"><div class="label">Supervisor feedback</div><div class="md">${md(docs.feedback)}</div></div>`:""}
+     ${qs.length?`<div class="sec"><div class="label">Questions</div>${qs.map(q=>`<div class="bubble q"><small>${q.id} · ${esc(q.from)} → ${esc(q.to)}</small>${esc(q.question)}</div>${q.answer?`<div class="bubble a"><small>${esc(q.answered_by||"")}</small>${esc(q.answer)}</div>`:""}`).join("")}</div>`:""}
+     ${attempts.length?`<div class="sec"><div class="label">Attempts</div><table class="att"><tr><th>#</th><th>Executor</th><th>Result</th><th>Time</th><th>Tokens</th><th>Cost</th></tr>${attempts.map(a=>{const u=a.usage||{};return `<tr><td>${a.n}</td><td>${esc(a.executor)}</td><td>${esc(a.status)}${a.check?(a.check.ok?" ✓":" ✗check"):""}</td><td>${dur(a.started,a.finished)}</td><td>${fmt((u.input||0)+(u.cache_read||0)+(u.cache_write||0)+(u.output||0))}</td><td>${money(a.cost_usd)}</td></tr>`;}).join("")}</table></div>`:""}
+   </div>`;
+  const lb=$("logbox"); if(lb && S._logHtml && S._logKey===t.id+"#"+cur) lb.innerHTML=S._logHtml;
+}
+async function refreshLog(){
+  const t=S.st?.tasks.find(x=>x.id===S.drawer); if(!t) return;
+  const n=Math.max(t.attempts?.length||0, t.run?.attempt||0); if(!n) return;
+  const a=S.logAttempt||n, L=await fetchLog(t.id,a).catch(()=>null), lb=$("logbox"); if(!L||!lb) return;
+  const stick=lb.scrollTop+lb.clientHeight>=lb.scrollHeight-30;
+  S._logKey=t.id+"#"+a;
+  S._logHtml=L.lines.map(l=>`<div class="ln"><time>${clock(l.ts)}</time><span class="k-${l.kind}">${l.kind==="tool"?"▸ ":l.kind==="text"?"":""}${esc(l.text)}</span></div>`).join("")||'<span class="muted">waiting for output…</span>';
+  if(lb.innerHTML!==S._logHtml){ lb.innerHTML=S._logHtml; if(stick) lb.scrollTop=lb.scrollHeight; }
+}
+
+/* ───────── events ───────── */
+document.addEventListener("click", async e=>{
+  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
+  if(!el) return;
+  try{
+    if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(S.view!=="overview"){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
+    if(el.dataset.ignite){ e.stopPropagation(); el.disabled=true; el.textContent="Igniting…"; const models=$("ig-sr")?readPicker("ig-"):undefined; if(models) lsSet("mc.models",JSON.stringify(models));
+      await post("/api/ignite",{p:el.dataset.ignite,models}).catch(()=>{el.disabled=false});
+      selectProject(el.dataset.ignite,"comms"); toast("Mission Control ignited. Your supervisor is looking around"); await tick(); return; }
+    if(el.id==="addBtn"){ const v=($("addPath")?.value||"").trim(); if(!v) return toast("Paste a folder path or a GitHub repo",true);
+      const repo=looksRepo(v), err=$("addErr"); if(err) err.textContent=""; el.disabled=true; el.textContent=repo?"Cloning…":"Adding…";
+      try{ const r=await post("/api/add-project",{path:v,into:($("cloneInto")?.value||"").trim()}); S.drafts.addPath=""; S.drafts.cloneInto=""; S._wasRepo=false; selectProject(r.path, r.initialized?"phases":"comms");
+        toast(r.cloned?"Cloned and added":(r.initialized?"Project added: already under Mission Control":"Project added. Ready to ignite")); S.view=r.initialized?"phases":"comms"; await tick(); }
+      catch(e){ if(err) err.textContent=e.message||"Couldn't add it"; el.disabled=false; el.textContent=repo?"Clone & Add":"Add"; }
+      return; }
+    if(el.dataset.uscope){ S.usageScope=el.dataset.uscope; S.usage=S.usageScope==="project"?S.usage:S.usage; await loadUsage(); render(); return; }
+    if(el.dataset.uproj){ selectProject(el.dataset.uproj, "tokens"); await tick(); return; }
+    if(el.dataset.ufilter){ S.usageFilter=S.usageFilter===el.dataset.ufilter&&el.dataset.ufilter!=="all"?"all":el.dataset.ufilter; render(); document.querySelector(".ulist:last-of-type")?.scrollIntoView?.({block:"nearest"}); return; }
+    if(el.dataset.uopen){ const id=el.dataset.uopen; if(S.usageOpen.has(id)) S.usageOpen.delete(id); else { S.usageOpen.add(id); if(!S.usageCalls[id]) api(`/api/usage-calls?p=${encodeURIComponent(S.cur)}&id=${encodeURIComponent(id)}`).then(r=>{ S.usageCalls[id]=r.calls; render(); }).catch(()=>{}); } render(); return; }
+    if(el.dataset.wcancel){ await post("/api/watch-cancel",{id:el.dataset.wcancel}); toast("Stopped waiting"); await tick(); return; }
+    if(el.dataset.reveal){ const r=await post("/api/reveal",{what:el.dataset.reveal,t:S.drawer}); toast("Opened in Finder"); return; }
+    if(el.dataset.remove){ e.stopPropagation(); e.preventDefault(); const p=S.projects.find(x=>x.path===el.dataset.remove); if(!p) return;
+      const busy=(p.counts?.running||0), warn=busy||p.supervisor?.running?`\n\nHeads up: ${busy?busy+" task"+(busy>1?"s are":" is")+" still running":"the supervisor is working"}. ${busy?"They":"It"} will finish, but nothing will manage ${busy?"them":"it"} while it's off the dashboard.`:"";
+      if(!confirm(`Remove "${p.name}" from the dashboard?\n\nYour files and the Mission Control data in the project stay exactly where they are. You can add the folder again at any time.${warn}`)) return;
+      await post("/api/remove-project",{p:p.path}); if(S.cur===p.path){ S.cur=null; S.view="overview"; lsSet("mc.view","overview"); } S.hashes={}; toast(`Removed "${p.name}". Its files are untouched`); await tick(); return; }
+    if(el.id==="sendChat"){ return sendChat(); }
+    if(el.id==="addPerm"){ const v=($("permRule")?.value||"").trim(); if(!v) return toast("Enter a rule, e.g. WebSearch",true); await post("/api/permission",{action:"add",rule:v}); S.drafts.permRule=""; toast("Allowed for this project"); await tick(); return; }
+    if(el.dataset.rmperm){ await post("/api/permission",{action:"remove",rule:el.dataset.rmperm}); toast("Removed"); await tick(); return; }
+    if(el.id==="ccCopy"){ try{ await navigator.clipboard.writeText(S.st.resume_cmd); toast("Copied. Paste it in a terminal to continue this chat in Claude Code"); }catch(e){ toast("Couldn't access the clipboard",true); } return; }
+    if(el.id==="prBtn"){ el.disabled=true; el.textContent="Creating…"; const reset=()=>{ el.disabled=false; el.textContent="Create Pull Request"; };
+      const go=async target=>{ const r=await post("/api/pr",target?{target}:{}); toast(r.url?"Pull request created":"Branch pushed"); if(r.url) window.open(r.url,"_blank","noopener"); };
+      try{ await go(); }
+      catch(err){ const t=err.data?.suggest_target;
+        if(t && confirm(`${err.message}\n\nOK opens the pull request against "${t}", containing only this mission's changes.`)){ try{ await go(t); }catch(e2){ toast(e2.message||"Couldn't open the pull request",true); reset(); } }
+        else reset(); }
+      await tick(); return; }
+    if(el.id==="copyBrief"){ const r=await api(`/api/brief?p=${encodeURIComponent(S.cur)}&t=${S.drawer}`); try{ await navigator.clipboard.writeText(r.brief); toast("Brief copied. Paste it to your teammate"); }catch(e){ toast("Couldn't access the clipboard",true); } return; }
+    if(el.id==="markDone"){ if(!confirm("Mark this task done? The supervisor will review what was delivered.")) return; await post("/api/done",{t:S.drawer}); toast("Sent to the supervisor for review"); await tick(); return; }
+    if(el.id==="sideAdd"){ S.view="overview"; lsSet("mc.view",S.view); render(); setTimeout(()=>{ const i=$("addPath"); i?.scrollIntoView({behavior:"smooth",block:"center"}); i?.focus(); },60); return; }
+    if(el.id==="saveModels"){ const mdl=readPicker("md-"); await post("/api/models",mdl); lsSet("mc.models",JSON.stringify(mdl)); ["sr","sm","se","er","em","ee"].forEach(k=>delete S.drafts["md-"+k]); toast("Models saved. Applies to the next supervisor turn and to tasks that haven't run"); await tick(); return; }
+    if(el.id==="approveBtn"){ el.disabled=true; const allow=[...document.querySelectorAll(".pp-chk:checked")].map(c=>c.dataset.rule); const r=await post("/api/approve",{allow}); toast("Launched "+(r.launched.join(", ")||"(waiting on dependencies)")); await tick(); return; }
+    if(el.id==="supReset"){ await post("/api/supervisor",{reset:true}); toast("Next supervisor turn starts fresh"); await tick(); return; }
+    if(el.id==="supTake"){ await post("/api/supervisor",{mode:"dashboard"}); toast("The dashboard now runs the supervisor"); await tick(); return; }
+    if(el.dataset.proj){ selectProject(el.dataset.proj); await tick(); return; }
+    if(el.dataset.act){ e.stopPropagation();
+      if(el.dataset.act==="run"){ const t=S.st?.tasks.find(x=>x.id===el.dataset.t), cap=(S.st?.mission.max_attempts||3)+(t?.attempt_bonus||0), used=t?.attempts?.length||0,
+          waiting=(S.st?.questions||[]).some(q=>q.task===el.dataset.t&&q.status==="open"&&q.permission);
+        if(t&&used>=cap&&!confirm(`${t.id} has already used ${used} of ${cap} attempts without finishing.\n\nRun it again anyway? Consider changing its model or splitting it first.`)) return;
+        if(t&&waiting&&!confirm(`${t.id} is waiting for your decision on a permission request. It will probably hit the same wall.\n\nRun it anyway?`)) return; }
+      if(el.dataset.act==="cancel" && !confirm(`Cancel ${el.dataset.t}? A cancelled task can't be run again.`)) return; await post("/api/"+el.dataset.act,{t:el.dataset.t}); toast({run:"Executor launched in a fresh session",stop:"Stopped",cancel:"Cancelled",resume:"Unpaused"}[el.dataset.act]); await tick(); return; }
+    if(el.dataset.answer){ await post("/api/answer",{q:el.dataset.answer,answer:el.dataset.val}); toast("Answer sent to supervisor"); await tick(); return; }
+    if(el.dataset.answerText){ const id=el.dataset.answerText, v=($("ans-"+id)?.value||"").trim(); if(!v) return toast("Write an answer first",true);
+      await post("/api/answer",{q:id,answer:v}); delete S.drafts["ans-"+id]; toast("Answer sent to supervisor"); await tick(); return; }
+    if(el.dataset.filter){ S.feedFilter=el.dataset.filter; render(); return; }
+    if(el.id==="sendNote"){ const v=($("note-box")?.value||"").trim(); if(!v) return toast("Write a message first",true);
+      await post("/api/note",{text:v}); S.drafts.note=""; $("note-box").value=""; toast("Sent. The supervisor reads it at its next step"); await tick(); return; }
+    if(el.id==="closeD"||el.id==="scrim"){ closeDrawer(); return; }
+    if(el.id==="autoT"){ const on=!S.st.mission.autopilot; await post("/api/autopilot",{on}); toast(on?"Autopilot on: ready tasks launch automatically":"Autopilot off"); await tick(); return; }
+    if(el.id==="runReady"){ const r=await post("/api/run-ready",{}); toast(r.launched.length?"Launched "+r.launched.join(", "):"Nothing ready"); await tick(); return; }
+    if(el.dataset.task){ openDrawer(el.dataset.task); return; }
+  }catch(err){ console.warn(err); }
+});
+/* Switching project keeps the page you're on (Chat stays Chat, Timeline stays Timeline). From All Projects it opens
+   the page you last worked in. Drafts (chat box, notes, rules) belong to a project and never follow you to another. */
+const GLOBAL_DRAFTS=["addPath","cloneInto"];
+S.draftsBy={}; S.lastView=lsGet("mc.lastview")||"phases";
+function selectProject(path, view){
+  if(path!==S.cur){
+    if(S.cur) S.draftsBy[S.cur]=Object.fromEntries(Object.entries(S.drafts).filter(([k])=>!GLOBAL_DRAFTS.includes(k)));
+    const keep=Object.fromEntries(Object.entries(S.drafts).filter(([k])=>GLOBAL_DRAFTS.includes(k)));
+    S.drafts={...keep,...(S.draftsBy[path]||{})};
+    S.cur=path; lsSet("mc.project",path);
+    S.st=null; S.usage=null; S.usageOpen=new Set(); S.usageCalls={}; S.usageFilter="all"; S.logs={}; S.hashes={}; closeDrawer();
+  }
+  S.usageScope="project";
+  S.view = view || (S.view==="overview" ? S.lastView : S.view);
+  if(S.view!=="overview"){ S.lastView=S.view; lsSet("mc.lastview",S.view); }
+  lsSet("mc.view",S.view);
+}
+async function sendChat(){
+  const box=$("chat-box"), v=(box?.value||"").trim(); if(!v) return;
+  box.value=""; S.drafts.chat="";
+  try{ await post("/api/chat",{text:v}); }catch(err){ box.value=v; S.drafts.chat=v; return; }
+  await tick();
+}
+document.addEventListener("keydown", e=>{ if(e.target.id==="permRule" && e.key==="Enter"){ e.preventDefault(); $("addPerm")?.click(); } if(e.target.id==="chat-box" && e.key==="Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); sendChat(); }
+  if(e.target.id==="addPath" && e.key==="Enter"){ e.preventDefault(); $("addBtn")?.click(); } });
+document.addEventListener("input", e=>{ const k=e.target.dataset?.draft; if(k) S.drafts[k]=e.target.value;
+  if(e.target.id==="addPath"){ const was=S._wasRepo, now=looksRepo(e.target.value); S._wasRepo=now; if(was!==now){ delete S.hashes.main; const pos=e.target.selectionStart; render(); const i=$("addPath"); if(i){ i.focus(); i.setSelectionRange(pos,pos); } } } });
+document.addEventListener("change", async e=>{ const t=e.target;
+  if(t.dataset?.limit){ const v=Number(t.value), k=t.dataset.limit, body={"lim-att":{max_attempts:v},"lim-bud":{budget:v},"lim-calls":{max_turns:v},"lim-sup":{sup_turns:v}}[k];
+    await post("/api/limits",body).catch(()=>{}); toast("Limit saved"); await tick(); return; }
+  if(t.dataset?.pick){ S.drafts[t.dataset.draft]=t.value; const sel=$(t.dataset.pick); if(sel){ S.drafts[t.dataset.pick]=""; S.drafts[t.dataset.pick.slice(0,-1)+"e"]=""; delete S.hashes.main; S.drafts[t.dataset.pick+"-x"]=""; renderPickerNow(t.dataset.pick.slice(0,3)); } }
+  else if(t.matches?.(".mcell select")){ S.drafts[t.dataset.draft]=t.value; const x=$(t.id+"-x"); if(x){ x.style.display=t.value==="__custom"?"":"none"; if(t.value==="__custom") x.focus(); }
+    const h=$(t.id+"-h"); if(h) h.innerHTML=modelHint(t.value,h.dataset.default); delete S.hashes.main; const sx=window.scrollY; render(); } });
+function renderPickerNow(){ delete S.hashes.main; render(); }
+document.addEventListener("change", async e=>{
+  if(e.target.id==="projSel"){ selectProject(e.target.value); await tick(); }
+  if(e.target.id==="execSel"){ let to=e.target.value; if(to==="human") return;
+    if(to==="__person"){ to=(prompt("GitHub username of the teammate:")||"").trim().replace(/^@/,""); if(!to){ delete S.hashes.drawer; renderDrawer(); return; } }
+    await post("/api/assign",{t:S.drawer,to}).catch(()=>{}); toast(e.target.value==="__person"?`Assigned to @${to}`:"Executor changed"); delete S.hashes.drawer; await tick(); }
+  if(e.target.id==="attSel"){ S.logAttempt=+e.target.value; delete S.hashes.drawer; S._logHtml=""; await renderDrawer(); refreshLog(); }
+});
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeDrawer(); });
+window.addEventListener("resize", ()=>{ clearTimeout(window._rz); window._rz=setTimeout(render,150); });
+api("/api/config").then(c=>{ S.cloneDir=c.clone_dir; }).catch(()=>{});
+tick();
+</script>
+</body>
+</html>
