@@ -1,0 +1,38 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Simulator mission, stop, dashboard
+        shell: bash
+        run: |
+          set -e
+          export MC_HOME="$RUNNER_TEMP/mchome" MC_DEMO_SPEED=30
+          PY=python
+          MC="$PY $GITHUB_WORKSPACE/scripts/mc.py"
+          mkdir "$RUNNER_TEMP/proj" && cd "$RUNNER_TEMP/proj"
+          $MC init --name CI --goal ci --executor simulator
+          $MC add --title demo --executor simulator
+          $MC add --title long --executor simulator
+          $MC run T-001
+          for i in $(seq 1 30); do $MC status | grep -q "T-001 .*| done" && break; sleep 1; done
+          $MC status | grep "T-001 .*| done"
+          MC_DEMO_SPEED=0.1 $MC run T-002
+          sleep 3
+          $MC stop T-002
+          $MC status | grep "T-002 .*todo"
+          $PY "$GITHUB_WORKSPACE/scripts/dashboard.py" --port 7791 > "$RUNNER_TEMP/dash.log" 2>&1 &
+          sleep 5
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:7791/)
+          test "$code" = 200
+          bad=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: evil.com" http://127.0.0.1:7791/)
+          test "$bad" = 403

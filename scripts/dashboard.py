@@ -20,7 +20,11 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import compat  # noqa: E402
 import mc  # noqa: E402
+
+if __name__ == "__main__":
+    compat.ensure_utf8()
 
 UI = mc.SKILL_DIR / "dashboard" / "index.html"
 TOKEN = secrets.token_hex(16)
@@ -118,7 +122,7 @@ def peek_files(path: Path) -> list:
 
 def runner_info() -> dict:
     return {k: {"label": v.get("label", k), "model": v.get("model", ""), "models": v.get("models", []),
-                "efforts": v.get("efforts", []), "role": v.get("role", "executor"), "installed": bool(mc.shutil.which(str(v["cmd"][0]).replace("{python}", "python3")))}
+                "efforts": v.get("efforts", []), "role": v.get("role", "executor"), "installed": bool(mc.shutil.which(str(v["cmd"][0]).replace("{python}", sys.executable)))}
             for k, v in mc.load_runners().items()}
 
 
@@ -193,7 +197,7 @@ def full_state(m: mc.Mission) -> dict:
 
 
 def read_log(m: mc.Mission, tid: str, attempt: int, offset: int) -> dict:
-    if not tid.startswith("T-") or "/" in tid:
+    if not TASK_ID.fullmatch(tid):
         raise PermissionError("bad task id")
     p = m.dir / "runs" / tid / f"attempt-{int(attempt)}.jsonl"
     if not p.exists():
@@ -439,14 +443,10 @@ class Handler(BaseHTTPRequestHandler):
                 target = m.dir
                 if body.get("what") == "report":
                     cand = m.dir / "reports" / f"{tid}.md"
-                    target = cand if cand.exists() and tid and tid.startswith("T-") and "/" not in tid else m.dir / "reports"
+                    target = cand if cand.exists() and tid and TASK_ID.fullmatch(tid) else m.dir / "reports"
                 if not str(target.resolve()).startswith(str(m.dir.resolve())):
                     return self._send(400, {"error": "not inside the mission folder"})
-                if sys.platform == "darwin":
-                    mc.subprocess.Popen(["open", "-R", str(target)] if target.is_file() else ["open", str(target)])
-                elif sys.platform.startswith("linux"):
-                    mc.subprocess.Popen(["xdg-open", str(target if target.is_dir() else target.parent)])
-                else:
+                if not compat.reveal(target):
                     return self._send(400, {"error": "can't open folders on this system", "path": str(target)})
                 return self._send(200, {"ok": True, "path": str(target)})
             elif u.path == "/api/watch-cancel":
@@ -502,24 +502,23 @@ def holder_pid(port: int):
             return pid
     except (OSError, ValueError):
         pass
-    try:
-        out = mc.subprocess.run(["lsof", "-t", f"-iTCP:{port}", "-sTCP:LISTEN"], capture_output=True, text=True).stdout.split()
-        return int(out[0]) if out else None
-    except (OSError, ValueError):
-        return None
+    return compat.port_holder(port)
 
 
 def is_dashboard(pid: int) -> bool:
-    cmd = mc.subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True).stdout
-    return "dashboard.py" in cmd
+    return "dashboard.py" in compat.process_command(pid)
+
+
+class Server(ThreadingHTTPServer):
+    allow_reuse_address = not compat.IS_WIN  # on Windows SO_REUSEADDR would let a second dashboard share the port
 
 
 def bind(port: int) -> ThreadingHTTPServer:
     """Start the server; if an older Mission Control dashboard holds the port, replace it."""
     try:
-        return ThreadingHTTPServer(("127.0.0.1", port), Handler)
+        return Server(("127.0.0.1", port), Handler)
     except OSError as e:
-        if e.errno not in (48, 98):  # EADDRINUSE on macOS / Linux
+        if e.errno not in compat.ADDR_IN_USE:
             raise
     pid = holder_pid(port)
     if not pid or pid == os.getpid() or not is_dashboard(pid):
@@ -527,16 +526,16 @@ def bind(port: int) -> ThreadingHTTPServer:
               file=sys.stderr)
         sys.exit(1)
     print(f"Replacing the Mission Control dashboard already running on port {port} (pid {pid})…", flush=True)
-    os.kill(pid, signal.SIGTERM)
+    compat.terminate_pid(pid)
     for _ in range(50):
         time.sleep(0.1)
         try:
-            return ThreadingHTTPServer(("127.0.0.1", port), Handler)
+            return Server(("127.0.0.1", port), Handler)
         except OSError:
             continue
-    os.kill(pid, signal.SIGKILL)
+    compat.terminate_pid(pid, force=True)
     time.sleep(0.3)
-    return ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    return Server(("127.0.0.1", port), Handler)
 
 
 def main():

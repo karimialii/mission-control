@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import fcntl
 import json
 import os
 import random
@@ -27,7 +26,11 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import compat  # noqa: E402
 import gitops  # noqa: E402
+
+if __name__ == "__main__":
+    compat.ensure_utf8()
 SKILL_DIR = HERE.parent
 MC_HOME = Path(os.environ.get("MC_HOME", str(Path.home() / ".mission-control")))
 
@@ -71,7 +74,7 @@ def write_json(p, data) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_name(f".{p.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False))
-    os.replace(tmp, p)
+    compat.replace_file(tmp, p)
 
 
 def die(msg: str, code: int = 1):
@@ -80,15 +83,10 @@ def die(msg: str, code: int = 1):
 
 
 def pid_alive(pid) -> bool:
-    if not pid:
-        return False
     try:
-        os.kill(int(pid), 0)
-        return True
-    except (ProcessLookupError, ValueError):
+        return compat.pid_alive(pid)
+    except ValueError:
         return False
-    except PermissionError:
-        return True
 
 
 def short(s: str, n: int = 90) -> str:
@@ -96,30 +94,9 @@ def short(s: str, n: int = 90) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
-def descendants(pid: int) -> list:
-    out, stack = [], [pid]
-    while stack:
-        cur = stack.pop()
-        cp = subprocess.run(["pgrep", "-P", str(cur)], capture_output=True, text=True)
-        for tok in cp.stdout.split():
-            if tok.isdigit():
-                out.append(int(tok))
-                stack.append(int(tok))
-    return out
-
-
 def stop_tree(proc) -> None:
     """Stop a headless CLI and anything it left running in the background (its helper scripts, sleeps)."""
-    kids = descendants(proc.pid)
-    try:
-        proc.terminate()
-    except OSError:
-        pass
-    for k in kids:
-        try:
-            os.kill(k, signal.SIGTERM)
-        except OSError:
-            pass
+    compat.stop_tree(proc)
 
 
 def watch_for_exit_after_result(proc, grace: float | None = None) -> threading.Thread:
@@ -138,7 +115,10 @@ def watch_for_exit_after_result(proc, grace: float | None = None) -> threading.T
 
 
 def clean_env() -> dict:
-    return {k: v for k, v in os.environ.items() if k not in STRIP_ENV}
+    env = {k: v for k, v in os.environ.items() if k not in STRIP_ENV}
+    if compat.IS_WIN:
+        env.setdefault("PYTHONUTF8", "1")
+    return env
 
 
 # ───────────────────────────── registry ─────────────────────────────
@@ -222,11 +202,11 @@ class Mission:
     def lock(self):
         self.dir.mkdir(exist_ok=True)
         with open(self.dir / ".lock", "a") as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
+            compat.lock(f)
             try:
                 yield
             finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
+                compat.unlock(f)
 
     def meta(self) -> dict:
         return read_json(self.dir / "mission.json", {})
@@ -809,7 +789,7 @@ def launch(m: Mission, tid: str, force: bool = False) -> int:
     p = subprocess.Popen(
         [sys.executable, str(HERE / "mc.py"), "_exec", str(m.root), tid, str(attempt)],
         cwd=str(m.root), stdin=subprocess.DEVNULL, stdout=err, stderr=subprocess.STDOUT,
-        start_new_session=True, env=clean_env(),
+        env=clean_env(), **compat.spawn_kwargs(),
     )
     err.close()
 
@@ -827,7 +807,7 @@ def schedule(m: Mission) -> list:
     Serialised with its own lock file so concurrent schedulers can't overshoot max_parallel."""
     m.dir.mkdir(exist_ok=True)
     with open(m.dir / ".sched.lock", "a") as lf:
-        fcntl.flock(lf, fcntl.LOCK_EX)
+        compat.lock(lf)
         try:
             meta = m.meta()
             if meta.get("phase") in GATED_PHASES:
@@ -848,7 +828,7 @@ def schedule(m: Mission) -> list:
                     pass
             return launched
         finally:
-            fcntl.flock(lf, fcntl.LOCK_UN)
+            compat.unlock(lf)
 
 
 def stop_task(m: Mission, tid: str, final_status: str = "todo") -> None:
@@ -863,10 +843,7 @@ def stop_task(m: Mission, tid: str, final_status: str = "todo") -> None:
             t["paused"] = True
     t = m.update_task(tid, f)
     if pid and pid_alive(pid):
-        try:
-            os.killpg(int(pid), signal.SIGTERM)
-        except (ProcessLookupError, PermissionError):
-            pass
+        compat.kill_group(pid)
     if final_status == "cancelled":
         try:
             if is_human(t) and (t.get("github") or {}).get("issue") and gitops.gh_ready(m):
@@ -1098,9 +1075,11 @@ def _inside(m: Mission, raw: str) -> Path:
 def process_lines() -> list:
     """Command lines of running processes, minus Mission Control's own and the Claude CLIs (their prompts
     mention everything, so they would always look like a match)."""
-    cp = subprocess.run(["ps", "-axo", "command="], capture_output=True, text=True)
-    skip = re.compile(r"(^|/)claude( |$)|mc\.py|dashboard\.py")
-    return [ln for ln in cp.stdout.splitlines() if not skip.search(ln)]
+    lines = compat.process_commands()
+    if lines is None:
+        return None  # this system can't list processes
+    skip = re.compile(r"(^|[/\\])claude(\.exe)?( |$)|mc\.py|dashboard\.py")
+    return [ln for ln in lines if not skip.search(ln)]
 
 
 def cond_text(c: dict) -> str:
@@ -1122,6 +1101,8 @@ def cond_met(m: Mission, c: dict, procs: list) -> bool:
                 return c["contains"][1] in fh.read()
         except OSError:
             return False
+    if procs is None:
+        return False  # can't tell, so never fire on a guess
     return not any(c["gone"] in ln for ln in procs)
 
 
@@ -1336,11 +1317,19 @@ def finalize(m: Mission, tid: str, attempt: int, rep: dict | None, usage: dict, 
         m.event("question", tid, f"{tid} asks supervisor: {short(rep['question'], 140)}", task=tid, question=qid, to="supervisor")
     elif status == "done" and t.get("check"):
         try:
-            cp = subprocess.run(t["check"], shell=True, cwd=str(workdir or m.root), capture_output=True, text=True, timeout=900)
+            if compat.IS_WIN:
+                sh = compat.bash()
+                if not sh:
+                    raise FileNotFoundError("checks are written for bash; install Git for Windows (Git Bash) or use WSL")
+                cp = subprocess.run([sh, "-c", t["check"]], cwd=str(workdir or m.root), capture_output=True, text=True, timeout=900)
+            else:
+                cp = subprocess.run(t["check"], shell=True, cwd=str(workdir or m.root), capture_output=True, text=True, timeout=900)
             tail = "\n".join((cp.stdout + cp.stderr).strip().splitlines()[-25:])
             check_result = {"ok": cp.returncode == 0, "code": cp.returncode, "tail": tail}
         except subprocess.TimeoutExpired:
             check_result = {"ok": False, "code": -1, "tail": "check timed out after 900s"}
+        except FileNotFoundError as e:
+            check_result = {"ok": False, "code": -1, "tail": str(e)}
         md += [f"**Check** `{t['check']}`: {'PASSED' if check_result['ok'] else 'FAILED (exit %s)' % check_result['code']}", ""]
         if not check_result["ok"]:
             md += ["```", check_result["tail"], "```", ""]
@@ -1457,6 +1446,9 @@ def cmd_exec(args) -> None:
     budget = meta.get("executor_budget_usd")
     turn_cap = int(meta.get("executor_max_turns") or 0)
     cmd = apply_permissions(m, build_cmd(runner, subs, model, effort, f"{float(budget):g}" if budget else ""))
+    if compat.cmdline_too_long(cmd):  # Windows caps the command line: hand over the brief as a file instead
+        subs["prompt"] = f"Your full task brief is in the file {prompt_file}. Read it first, then follow it exactly."
+        cmd = apply_permissions(m, build_cmd(runner, subs, model, effort, f"{float(budget):g}" if budget else ""))
     m.update_task(tid, lambda x: x.setdefault("run", {}).update(model=model_label(rname, model), effort=effort,
                                                                   budget=budget or None, turn_cap=turn_cap or None))
     if t.get("check") and "--allowedTools" in cmd:
@@ -1468,6 +1460,11 @@ def cmd_exec(args) -> None:
             cmd[i] += f",Bash({prefix})" + f",Bash({prefix} *)"
     if not shutil.which(cmd[0]) and not Path(cmd[0]).exists():
         finalize(m, tid, attempt, None, {}, None, False, error=f"executable '{cmd[0]}' not found on PATH")
+        return
+    try:
+        cmd = compat.resolve_exe(cmd)
+    except RuntimeError as e:
+        finalize(m, tid, attempt, None, {}, None, False, error=str(e))
         return
     st = StreamState(runner.get("parser", "text"))
     t_started = time.time()
@@ -1486,7 +1483,7 @@ def cmd_exec(args) -> None:
     def on_term(*_):
         proc.terminate()
     signal.signal(signal.SIGTERM, on_term)
-    timer = threading.Timer(timeout, proc.kill)
+    timer = threading.Timer(timeout, compat.kill_hard, [proc])
     timer.start()
     last_update = 0.0
     capped = ""
@@ -1763,7 +1760,7 @@ def wake_supervisor(m: Mission, kickoff: bool = False) -> bool:
         return False  # the running supervisor picks up queued messages before it exits
     p = subprocess.Popen([sys.executable, str(HERE / "mc.py"), "_supervise", str(m.root)] + (["--kickoff"] if kickoff else []),
                          cwd=str(m.root), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                         stderr=open(m.dir / "supervisor.err.txt", "a"), start_new_session=True, env=clean_env())
+                         stderr=open(m.dir / "supervisor.err.txt", "a"), env=clean_env(), **compat.spawn_kwargs())
     SPAWNED.append(p)
     return True
 
@@ -1772,10 +1769,15 @@ def ensure_mc_shim() -> Path:
     bindir = MC_HOME / "bin"
     bindir.mkdir(parents=True, exist_ok=True)
     shim = bindir / "mc"
-    body = f'#!/bin/sh\nexec "{sys.executable}" "{HERE / "mc.py"}" "$@"\n'
+    body = f'#!/bin/sh\nexec "{Path(sys.executable).as_posix()}" "{(HERE / "mc.py").as_posix()}" "$@"\n'
     if not shim.exists() or shim.read_text() != body:
         shim.write_text(body)
         shim.chmod(0o755)
+    if compat.IS_WIN:  # cmd.exe and PowerShell look for mc.cmd; Git Bash uses the sh shim above
+        cmdbody = f'@echo off\r\n"{sys.executable}" "{HERE / "mc.py"}" %*\r\n'
+        cmdshim = bindir / "mc.cmd"
+        if not cmdshim.exists() or cmdshim.read_text() != cmdbody:
+            cmdshim.write_bytes(cmdbody.encode())
     return bindir
 
 
@@ -1836,7 +1838,13 @@ def run_supervisor_turn(m: Mission, message: str, trigger: str = "") -> dict:
         cmd += ["--resume", sup["session_id"]]
     if not shutil.which(cmd[0]):
         return {"error": f"'{cmd[0]}' not found on PATH"}
-    env = {**clean_env(), "PATH": f"{ensure_mc_shim()}:{os.environ.get('PATH', '')}", "MC_ROLE": "supervisor",
+    try:
+        cmd = compat.resolve_exe(cmd)
+        if compat.cmdline_too_long(cmd):
+            return {"error": "the supervisor prompt is too long for a Windows command line; run Mission Control inside WSL"}
+    except RuntimeError as e:
+        return {"error": str(e)}
+    env = {**clean_env(), "PATH": f"{ensure_mc_shim()}{os.pathsep}{os.environ.get('PATH', '')}", "MC_ROLE": "supervisor",
            "MC_HOME": str(MC_HOME)}
     logdir = m.dir / "supervisor"
     logdir.mkdir(exist_ok=True)
@@ -1846,7 +1854,7 @@ def run_supervisor_turn(m: Mission, message: str, trigger: str = "") -> dict:
     session_id = None
     proc = subprocess.Popen(cmd, cwd=str(m.root), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             stdin=subprocess.DEVNULL, text=True, bufsize=1, env=env)
-    timer = threading.Timer(int(runner.get("timeout", 1800)), proc.kill)
+    timer = threading.Timer(int(runner.get("timeout", 1800)), compat.kill_hard, [proc])
     timer.start()
     last_ctx = 0
     st.on_result = lambda: watch_for_exit_after_result(proc)
@@ -1952,7 +1960,7 @@ def cmd_supervise(a) -> None:
     fix_supervisor_costs(m)
     lf = open(m.dir / ".supervisor.lock", "a")
     try:
-        fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        compat.lock(lf, blocking=False)
     except BlockingIOError:
         return
     sup_update(m, pid=os.getpid(), running=True, started=now(), step="thinking")
@@ -2008,7 +2016,7 @@ def cmd_supervise(a) -> None:
                 chat_add(m, "system", "Supervisor context got large, so the next turn starts a fresh session from STATE.md (saves tokens).")
     finally:
         sup_update(m, pid=None, running=False, step="")
-        fcntl.flock(lf, fcntl.LOCK_UN)
+        compat.unlock(lf)
 
 
 def set_models(m: Mission, sup_runner=None, sup_model=None, exec_runner=None, exec_model=None,
@@ -2884,7 +2892,7 @@ def cmd_watch(a):
             die(str(e))
         procs = process_lines()
         for g in w["fail_if_gone"] + [c["gone"] for c in w["until"] if "gone" in c]:
-            if not any(g in ln for ln in procs):
+            if procs is not None and not any(g in ln for ln in procs):
                 print(f"warning: no running process matches '{g}' right now. If that's a typo the watch fires immediately.", file=sys.stderr)
         print(f"{w['id']} watching: " + " AND ".join(cond_text(c) for c in w["until"]) + f" (checked every {w['every']}s, no tokens used). "
               "End your turn now; you'll be woken when it happens.")

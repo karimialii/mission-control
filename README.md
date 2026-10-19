@@ -38,13 +38,14 @@
 [Quick start](#quick-start) · [Tour](#tour) · [Install](#install-once) · [Platforms and agents](#supported-platforms-and-agents) · [Use it in a project](#use-it-in-any-project) · [Models](#choose-your-models-expensive-supervisor-cheap-executors) · [Dashboard](#dashboard-one-for-all-projects) · [Watches](#waiting-for-long-jobs-watches) · [Safety limits](#safety-limits-nothing-loops-nothing-runs-away) · [Permissions](#permissions) · [Security model](#security-model-read-before-use) · [Teams and git](#teams-git-github-and-teammates) · [Runners](#runners-adding-any-ai) · [Token model](#token-model) · [Files](#files) · [License](#license)
 
 ## Quick start
-**1. Install** (macOS or Linux, Python 3.9+):
+**1. Install** (macOS, Linux or Windows, Python 3.9+):
 ```bash
 git clone https://github.com/karimialii/mission-control.git
 cd mission-control && bash install.sh
 ```
+On Windows, use WSL2 and the same commands (recommended), or native PowerShell with `.\install.ps1`. See [Windows](#windows).
 
-**2. Try it for free** with the simulator (no model calls):
+**2. Try it for free** with the simulator (no model calls). Windows PowerShell users: see [Windows](#windows) for the equivalent commands.
 ```bash
 mkdir -p /tmp/mc-demo && cd /tmp/mc-demo
 mc() { python3 "$HOME/.claude/skills/mission-control/scripts/mc.py" "$@"; }
@@ -92,12 +93,15 @@ Or open the dashboard, choose **All Projects → Add a project**, paste a folder
 
 ## Install (once)
 ```bash
-bash install.sh
+bash install.sh          # macOS, Linux, WSL
 ```
-This symlinks the folder to `~/.claude/skills/mission-control`. Nothing is copied into your projects.
+```powershell
+.\install.ps1            # native Windows (PowerShell)
+```
+This links the folder to `~/.claude/skills/mission-control` (a symlink, or a directory junction on Windows). Nothing is copied into your projects.
 
 ## Supported platforms and agents
-- **OS:** macOS and Linux. Windows isn't supported (the installer is bash, and the scripts use `ps`, `pgrep`, `lsof` and `open`/`xdg-open`). WSL may work but is untested.
+- **OS:** macOS and Linux (tested). Windows: WSL2 runs it as plain Linux, and native Windows is supported but **experimental** (see [Windows](#windows)).
 - **Requirements:** Python 3.9+ (stdlib only), `git`, and optionally the GitHub CLI (`gh`) for issues and pull requests.
 
 | Agent | As supervisor | As executor |
@@ -107,7 +111,25 @@ This symlinks the folder to `~/.claude/skills/mission-control`. Nothing is copie
 | Gemini CLI | Untested template; add an approval mode you trust | Untested template; without an approval flag, headless tool calls may stall |
 | Any other agent with a shell | Point it at `AGENTS.md` / `SKILL.md` and run `python3 <path-to-this-folder>/scripts/mc.py` | Hand it `mc.py brief T-00x`; it reports with `mc.py report` |
 
-`install.sh` only installs for Claude Code. For other agents, clone this folder anywhere and tell the agent where it is (for example, reference `AGENTS.md` from your project's own `AGENTS.md`). Replace "this skill's base directory" in `SKILL.md` with that path. Check the Codex and Gemini runner flags in `runners.default.json` against your installed CLI version before relying on them.
+`install.sh` / `install.ps1` only install for Claude Code. For other agents, clone this folder anywhere and tell the agent where it is (for example, reference `AGENTS.md` from your project's own `AGENTS.md`). Replace "this skill's base directory" in `SKILL.md` with that path. Check the Codex and Gemini runner flags in `runners.default.json` against your installed CLI version before relying on them.
+
+### Windows
+**Recommended: WSL2.** Inside a WSL shell it is plain Linux, so use the Linux instructions and keep your projects in the WSL filesystem. The dashboard opens at `http://127.0.0.1:7777/` from your Windows browser.
+
+**Native Windows (experimental).** The code has Windows paths for file locking, process control, folder opening and UTF-8, but it has only been exercised on macOS so far. Please report problems. What you need:
+- Python 3.9+ on `PATH` as `python` (or `py`), and `git`.
+- **Git for Windows** if your tasks use `--check`: checks are written in bash syntax and run through Git Bash.
+- A **native `.exe`** build of the agent CLI (for example Claude Code's native installer). Runners that resolve to a `.cmd`/`.bat` wrapper (typical for npm-installed CLIs) are refused, because `cmd.exe` would re-interpret the prompt. Use WSL for those.
+
+```powershell
+git clone https://github.com/karimialii/mission-control.git
+cd mission-control; .\install.ps1
+function mc { python "$HOME\.claude\skills\mission-control\scripts\mc.py" @args }
+mkdir $HOME\mc-demo; cd $HOME\mc-demo
+mc init --name Demo --goal "Try mission control" --executor simulator
+mc dashboard --open
+```
+Stopping a task ends its whole process tree with `taskkill /T /F`. Processes are listed with PowerShell, which makes `mc watch --gone` a little slower than on macOS and Linux.
 
 ## Use it in any project
 There are two ways to start, and both end up in the same dashboard.

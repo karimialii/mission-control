@@ -19,6 +19,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import compat
+
 MARK = "<!-- mission-control -->"
 
 
@@ -211,13 +213,12 @@ def diff(m, tid: str, full: bool = False, human: bool = False) -> str:
 def integrate(m, tid: str, title: str, human: bool = False) -> tuple:
     """Merge a task branch into the mission branch. Returns (ok, message).
     Tasks often finish at the same moment, and two merges into one worktree collide, so they take turns."""
-    import fcntl
     with open(m.dir / ".merge.lock", "a") as lf:
-        fcntl.flock(lf, fcntl.LOCK_EX)
+        compat.lock(lf)
         try:
             return _integrate(m, tid, title, human)
         finally:
-            fcntl.flock(lf, fcntl.LOCK_UN)
+            compat.unlock(lf)
 
 
 def _integrate(m, tid: str, title: str, human: bool = False) -> tuple:

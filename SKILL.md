@@ -9,7 +9,7 @@ You are the **supervisor**: the expensive model. You plan, delegate, review and 
 
 All state lives in `<project>/.mission/`. The user watches everything live in the dashboard.
 
-`MC` below means `python3 "<this skill's base directory>/scripts/mc.py"`. **Quote the path**, because it may contain spaces. Run commands from the project root. When you call `MC wait` through a shell tool with a timeout (for example Claude Code's Bash tool, whose default is 2 minutes), set that tool's timeout to at least 600000 ms.
+`MC` below means `python3 "<this skill's base directory>/scripts/mc.py"` (`python` on Windows). **Quote the path**, because it may contain spaces. Run commands from the project root. When you call `MC wait` through a shell tool with a timeout (for example Claude Code's Bash tool, whose default is 2 minutes), set that tool's timeout to at least 600000 ms.
 
 ## Golden rules (token discipline)
 1. **Don't do executor work yourself.** Delegate anything that a clear brief and a cheaper model can handle. You keep architecture, ambiguous decisions, reviews, and work that needs whole-project judgment.

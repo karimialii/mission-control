@@ -37,7 +37,7 @@
       "--disallowedTools",
       "Bash(python3 -m pip*),Bash(pip *),Bash(npm install*)",
       "--allowedTools",
-      "Read,Edit,Write,Glob,Grep,Bash(ls *),Bash(cat *),Bash(git status*),Bash(git diff*),Bash(npm test*),Bash(npm run test*),Bash(npm run build*),Bash(pytest*),Bash(python3 -m *),Bash(npm run *)"
+      "Read,Edit,Write,Glob,Grep,Bash(ls *),Bash(cat *),Bash(git status*),Bash(git diff*),Bash(npm test*),Bash(npm run test*),Bash(npm run build*),Bash(pytest*),Bash(python3 -m *),Bash(python -m *),Bash(npm run *)"
     ],
     "model_price": {
       "claude-haiku-5-5": 0.1,
@@ -164,7 +164,7 @@
       "--disallowedTools",
       "Bash(python3 -m pip*),Bash(pip *),Bash(npm install*)",
       "--allowedTools",
-      "Read,Edit,Write,Glob,Grep,Bash(mc *),Bash(ls *),Bash(cat *),Bash(git status*),Bash(git diff*),Bash(git log*),Bash(npm test*),Bash(npm run test*),Bash(npm run build*),Bash(pytest*),Bash(python3 -m *),Bash(npm run *)"
+      "Read,Edit,Write,Glob,Grep,Bash(mc *),Bash(ls *),Bash(cat *),Bash(git status*),Bash(git diff*),Bash(git log*),Bash(npm test*),Bash(npm run test*),Bash(npm run build*),Bash(pytest*),Bash(python3 -m *),Bash(python -m *),Bash(npm run *)"
     ],
     "efforts": [
       "low",
