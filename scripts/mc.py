@@ -27,6 +27,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import compat  # noqa: E402
+compat.augment_path()
 import gitops  # noqa: E402
 import notify  # noqa: E402
 
@@ -143,6 +144,29 @@ def load_runners() -> dict:
         else:
             runners[k] = {**runners.get(k, {}), **v}
     return runners
+
+
+# AI CLIs Mission Control can drive: runner name -> (executable, how to get it, how to sign in)
+PROVIDERS = {
+    "claude": ("claude", "npm i -g @anthropic-ai/claude-code", "run `claude` once and sign in"),
+    "codex": ("codex", "npm i -g @openai/codex", "run `codex` once and sign in"),
+    "gemini": ("gemini", "npm i -g @google/gemini-cli", "run `gemini` once and sign in, or set GEMINI_API_KEY"),
+}
+
+
+def detect_providers() -> dict:
+    """{name: path or None} for every supported AI CLI."""
+    return {k: shutil.which(v[0]) for k, v in PROVIDERS.items()}
+
+
+def default_provider() -> str:
+    """The provider new projects should use: Claude if installed, else the first installed one, else Claude."""
+    found = detect_providers()
+    return "claude" if found.get("claude") else next((k for k, v in found.items() if v), "claude")
+
+
+def default_supervisor_runner() -> str:
+    return default_provider() + "-supervisor"
 
 
 # Older names kept working: name -> (runner, model)
@@ -1828,7 +1852,9 @@ def run_supervisor_turn(m: Mission, message: str, trigger: str = "") -> dict:
         return {"error": f"unknown supervisor runner {sup.get('runner')}"}
     system = (SKILL_DIR / "SKILL.md").read_text() + DASHBOARD_ADDENDUM
     if "{system}" not in runner["cmd"]:
-        message = system + "\n\n---\n\n" + message  # CLIs without a system-prompt flag
+        # CLIs without a system-prompt flag. Drop the YAML frontmatter: a prompt starting with "---" is parsed as an option.
+        body = re.sub(r"\A---\n.*?\n---\n", "", system, count=1, flags=re.S).lstrip()
+        message = body + "\n\n=====\n\n" + message
     subs = {"prompt": message, "system": system, "root": str(m.root), "mc": str(HERE / "mc.py"), "python": sys.executable,
             "task": "", "prompt_file": ""}
     cmd = apply_permissions(m, build_cmd(runner, subs, model, sup.get("effort") or ""))
@@ -2061,10 +2087,10 @@ def ignite(root: Path, name: str | None = None, models: dict | None = None) -> M
         (m.dir / d).mkdir(parents=True, exist_ok=True)
     meta = m.meta() or {"created": now()}
     meta.update(name=name or meta.get("name") or root.name, goal=meta.get("goal", ""), max_parallel=meta.get("max_parallel", 3),
-                default_executor=meta.get("default_executor", "claude"), autopilot=False,
+                default_executor=meta.get("default_executor") or default_provider(), autopilot=False,
                 phase="briefing" if not m.tasks() else meta.get("phase", "executing"))
     meta["supervisor"] = {**meta.get("supervisor", {}), "mode": "dashboard",
-                          "runner": (meta.get("supervisor") or {}).get("runner", "claude-supervisor")}
+                          "runner": (meta.get("supervisor") or {}).get("runner") or default_supervisor_runner()}
     m.save_meta(meta)
     if models:
         set_models(m, models.get("sup_runner"), models.get("sup_model"), models.get("exec_runner"), models.get("exec_model"),
@@ -2103,7 +2129,7 @@ def cmd_init(a):
     meta = m.meta() or {"created": now()}
     meta.update(name=a.name or meta.get("name") or root.name, goal=a.goal or meta.get("goal", ""),
                 max_parallel=a.parallel or meta.get("max_parallel", 3),
-                default_executor=a.executor or meta.get("default_executor", "claude"),
+                default_executor=a.executor or meta.get("default_executor") or default_provider(),
                 executor_model=a.executor_model or meta.get("executor_model", ""),
                 autopilot=meta.get("autopilot", False), phase=meta.get("phase", "executing"))
     meta.setdefault("supervisor", {"mode": "external"})

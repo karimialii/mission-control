@@ -71,7 +71,7 @@
     ]
   },
   "codex": {
-    "label": "Codex CLI (untested template)",
+    "label": "Codex CLI",
     "role": "executor",
     "model": "",
     "models": [],
@@ -85,7 +85,8 @@
       "codex",
       "exec",
       "--json",
-      "--full-auto",
+      "--sandbox",
+      "workspace-write",
       "{model_args}",
       "{prompt}"
     ]
@@ -179,7 +180,7 @@
     ]
   },
   "codex-supervisor": {
-    "label": "Codex CLI (untested template)",
+    "label": "Codex CLI",
     "role": "supervisor",
     "model": "",
     "models": [],
@@ -194,7 +195,8 @@
       "codex",
       "exec",
       "--json",
-      "--full-auto",
+      "--sandbox",
+      "workspace-write",
       "{model_args}",
       "{prompt}"
     ]

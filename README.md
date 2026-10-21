@@ -36,9 +36,15 @@
 | 🧪 **Simulator** | A fake executor that uses no tokens, so you can try the whole flow for free. |
 
 ## Contents
-[Quick start](#quick-start) · [Tour](#tour) · [Install](#install-once) · [Platforms and agents](#supported-platforms-and-agents) · [Use it in a project](#use-it-in-any-project) · [Models](#choose-your-models-expensive-supervisor-cheap-executors) · [Dashboard](#dashboard-one-for-all-projects) · [Watches](#waiting-for-long-jobs-watches) · [Safety limits](#safety-limits-nothing-loops-nothing-runs-away) · [Permissions](#permissions) · [Security model](#security-model-read-before-use) · [Teams and git](#teams-git-github-and-teammates) · [Runners](#runners-adding-any-ai) · [Token model](#token-model) · [Files](#files) · [License](#license)
+[Quick start](#quick-start) · [Tour](#tour) · [Install](#install-once) · [Platforms and agents](#supported-platforms-and-agents) · [Use it in a project](#use-it-in-any-project) · [Models](#choose-your-models-expensive-supervisor-cheap-executors) · [Dashboard](#dashboard-one-for-all-projects) · [Watches](#waiting-for-long-jobs-watches) · [Notifications](#notifications) · [Safety limits](#safety-limits-nothing-loops-nothing-runs-away) · [Permissions](#permissions) · [Security model](#security-model-read-before-use) · [Teams and git](#teams-git-github-and-teammates) · [Runners](#runners-adding-any-ai) · [Token model](#token-model) · [Files](#files) · [License](#license)
 
 ## Quick start
+**Fastest:** download the repo and run one command. It checks Python, git and which AI CLIs (Claude, Codex, Gemini) you have, picks a sensible default, and opens the dashboard.
+```bash
+python3 start.py          # Windows: double-click start.bat, or: python start.py
+```
+Nothing else to configure. If Claude isn't installed but Codex or Gemini is, new projects use that one. The steps below are the manual route.
+
 **1. Install** (macOS, Linux or Windows, Python 3.9+):
 ```bash
 git clone https://github.com/karimialii/mission-control.git
@@ -92,12 +98,6 @@ Or open the dashboard, choose **All Projects → Add a project**, paste a folder
 
 *Screenshots show the built-in simulator on demo projects.*
 
-## Install (once)
-```bash
-bash install.sh          # macOS, Linux, WSL
-```
-```powershell
-.\install.ps1            # native Windows (PowerShell)
 ## Notifications
 Long runs shouldn't wait on you. Mission Control can ping you when:
 - **a decision is waiting** (a question, permission or model request for you),
@@ -118,6 +118,12 @@ Settings are global (`~/.mission-control/notify.json`, readable only by you) and
 - The supervisor can't change these settings. Set `MC_NOTIFY=0` to silence everything for one run (for example in CI).
 - A channel that fails never affects a mission; errors go to `~/.mission-control/notify.log`.
 
+## Install (once)
+```bash
+bash install.sh          # macOS, Linux, WSL
+```
+```powershell
+.\install.ps1            # native Windows (PowerShell)
 ```
 This links the folder to `~/.claude/skills/mission-control` (a symlink, or a directory junction on Windows). Nothing is copied into your projects.
 
@@ -128,7 +134,7 @@ This links the folder to `~/.claude/skills/mission-control` (a symlink, or a dir
 | Agent | As supervisor | As executor |
 |---|---|---|
 | Claude Code | Tested. `install.sh` installs it as a skill | Tested (`claude` runner) |
-| Codex CLI | Untested template (`codex-supervisor`) | Untested template (`codex` runner) |
+| Codex CLI | Works (`codex-supervisor`) | Works (`codex` runner) |
 | Gemini CLI | Untested template; add an approval mode you trust | Untested template; without an approval flag, headless tool calls may stall |
 | Any other agent with a shell | Point it at `AGENTS.md` / `SKILL.md` and run `python3 <path-to-this-folder>/scripts/mc.py` | Hand it `mc.py brief T-00x`; it reports with `mc.py report` |
 
@@ -326,7 +332,7 @@ Runner templates live in `runners.default.json`. To override or add one, create 
   runs/T-001/         prompts, raw streams and transcripts per attempt
   STATE.md            compact resume file
 ```
+Global, in `~/.mission-control/`: `projects.json` (the project list), `notify.json` (notification settings, private), `notify.log` (delivery errors).
 
 ## License
 MIT. See `LICENSE`.
-Global, in `~/.mission-control/`: `projects.json` (the project list), `notify.json` (notification settings, private), `notify.log` (delivery errors).
