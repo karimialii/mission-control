@@ -304,6 +304,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, usage_csv(m), "text/csv")
             if u.path == "/api/config":
                 return self._send(200, {"clone_dir": str(default_clone_dir()).replace(str(Path.home()), "~", 1)})
+            if u.path == "/api/notify":
+                return self._send(200, mc.notify.masked())
             if u.path == "/api/projects":
                 return self._send(200, [summary(p, i) for p, i in project_paths().items()])
             if u.path == "/api/state":
@@ -360,6 +362,16 @@ class Handler(BaseHTTPRequestHandler):
                 mc.write_json(mc.MC_HOME / "projects.json", keep)  # only the list changes; no project files are touched
                 LAST_SYNC.pop(str(body.get("p")), None)
                 return self._send(200, {"ok": True, "removed": len(before) - len(keep)})
+            if u.path == "/api/notify":
+                try:
+                    mc.notify.update({k: body[k] for k in ("enabled", "kinds", "channels") if k in body})
+                except ValueError as e:
+                    return self._send(400, {"error": str(e)})
+                return self._send(200, mc.notify.masked())
+            if u.path == "/api/notify-test":
+                cfg = mc.notify.load()
+                res = mc.notify.send(cfg, "Mission Control test", "If you can read this, notifications work.", "test", wait=True)
+                return self._send(200, {"results": res or {"none": "no channel is switched on"}})
             m = get_mission(body["p"])
             tid = body.get("t")
             if tid is not None and not TASK_ID.fullmatch(str(tid)):

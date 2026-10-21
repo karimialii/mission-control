@@ -28,6 +28,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import compat  # noqa: E402
 import gitops  # noqa: E402
+import notify  # noqa: E402
 
 if __name__ == "__main__":
     compat.ensure_utf8()
@@ -221,6 +222,7 @@ class Mission:
         ev.update(extra)
         with open(self.dir / "events.jsonl", "a") as f:
             f.write(json.dumps(ev, ensure_ascii=False) + "\n")
+        notify.on_event(self, ev)
 
     def events(self, since: int = 0) -> list:
         try:
@@ -2969,6 +2971,52 @@ def cmd_limits(a):
     print(f"supervisor turns w/o you: {(meta.get('supervisor') or {}).get('max_auto_turns', 40)}")
 
 
+def cmd_notify(a):
+    """Where and when Mission Control pings you. Global, not per project (the supervisor may not change it)."""
+    cfg = notify.load()
+    act = a.action or "status"
+    if act != "status" and os.environ.get("MC_ROLE") == "supervisor":
+        die("notification settings are the user's to change. Ask them in chat.")
+    if act in ("on", "off"):
+        cfg = notify.update({"enabled": act == "on"})
+    elif act == "test":
+        if not cfg["enabled"]:
+            die("notifications are off. Turn them on with: mc notify on")
+        res = notify.send(cfg, "Mission Control test", "If you can read this, notifications work.", "test", wait=True)
+        if not res:
+            die("no channel is switched on. Try: mc notify set desktop")
+        for ch, r in res.items():
+            print(f"{ch:8} {'sent' if r == 'ok' else 'FAILED: ' + r}")
+        return
+    elif act == "set":
+        if a.channel not in notify.CHANNELS or not a.channel:
+            die("channel must be one of: " + ", ".join(notify.CHANNELS))
+        patch = {"on": not a.off}
+        if a.value:
+            patch["topic" if a.channel == "ntfy" else "url"] = a.value
+        if a.server:
+            patch["server"] = a.server
+        try:
+            cfg = notify.update({"channels": {a.channel: patch}})
+        except ValueError as e:
+            die(str(e))
+    elif act in ("mute", "unmute"):
+        if a.channel not in notify.KINDS:
+            die("kind must be one of: " + ", ".join(notify.KINDS))
+        cfg = notify.update({"kinds": {a.channel: act == "unmute"}})
+    shown = notify.masked(cfg)
+    print(f"notifications: {'on' if shown['enabled'] else 'OFF'}")
+    for name, ch in shown["channels"].items():
+        state = "on " if ch["on"] else "off"
+        extra = f"  ({ch['hint']})" if ch.get("hint") else ("  (not configured)" if name != "desktop" and not ch.get("set") else "")
+        if name == "desktop" and not shown["available"]["desktop"]:
+            extra = "  (not supported on this system)"
+        print(f"  {name:8} {state}{extra}")
+    print("  tell me about:")
+    for k, label in notify.KINDS.items():
+        print(f"    {'✓' if shown['kinds'][k] else '·'} {k:9} {label}")
+
+
 def cmd_models(a):
     """Show or set the supervisor (expensive) and executor (cheap) provider:model."""
     m = need_mission()
@@ -3108,6 +3156,12 @@ def main(argv=None):
     s.add_argument("--max-attempts", type=int); s.add_argument("--executor-budget", type=float, help="USD per executor run (0 = no cap)")
     s.add_argument("--executor-calls", type=int, help="max model calls per executor run (0 = no cap)")
     s.add_argument("--supervisor-turns", type=int, help="supervisor turns in a row without a message from you"); s.set_defaults(fn=cmd_limits)
+    s = sub.add_parser("notify", help="get pinged when a decision is waiting, something fails or a mission finishes")
+    s.add_argument("action", nargs="?", choices=["status", "on", "off", "test", "set", "mute", "unmute"])
+    s.add_argument("channel", nargs="?", help="set: desktop | slack | webhook | ntfy; mute/unmute: decision | failure | complete | watch")
+    s.add_argument("value", nargs="?", help="set: the webhook URL (slack, webhook) or topic (ntfy)")
+    s.add_argument("--off", action="store_true", help="with set: switch that channel off"); s.add_argument("--server", help="ntfy server (default https://ntfy.sh)")
+    s.set_defaults(fn=cmd_notify)
     s = sub.add_parser("models", help="show/set models: --supervisor claude-supervisor:opus --executor gemini:gemini-2.5-flash")
     s.add_argument("--supervisor"); s.add_argument("--executor")
     s.add_argument("--supervisor-effort"); s.add_argument("--executor-effort"); s.set_defaults(fn=cmd_models)

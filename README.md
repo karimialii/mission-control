@@ -30,6 +30,7 @@
 | 💸 **Cost control** | Exact per-run tokens and cost, a per-run budget cap, and a model-call cap. The supervisor can pick a *cheaper* model on its own, but a pricier one needs your OK. |
 | 🔐 **Permission requests** | Agents run headless with an allow-list. A denied command becomes an **Allow / Don't allow** card that only you can answer. |
 | 🌿 **Git and teams** | Each task works in its own worktree and branch, merged into `mission/<name>` on approval. You can hand tasks to teammates as GitHub issues and PRs, and finish with one PR (with a preview first). |
+| 🔔 **Notifications** | Get pinged on your desktop, phone (ntfy), Slack/Discord or any webhook when a decision is waiting, something fails or a mission finishes. |
 | ⏳ **Watches** | Wait for long external jobs (simulations, downloads) without polling and without spending tokens. |
 | 🔁 **Disposable chats** | `STATE.md` checkpoints let you drop a long supervisor chat and say "resume mission" in a fresh one. |
 | 🧪 **Simulator** | A fake executor that uses no tokens, so you can try the whole flow for free. |
@@ -97,6 +98,26 @@ bash install.sh          # macOS, Linux, WSL
 ```
 ```powershell
 .\install.ps1            # native Windows (PowerShell)
+## Notifications
+Long runs shouldn't wait on you. Mission Control can ping you when:
+- **a decision is waiting** (a question, permission or model request for you),
+- **something failed** (a runner error or a failed check),
+- **every task is done** (once per completion; adding tasks re-arms it),
+- **a watched external job** finished or failed.
+
+Channels: **desktop** (macOS and Linux with `notify-send`), **ntfy** (push to your phone), **Slack/Discord** webhook, and a generic **JSON webhook**. Set them up in **Chat → Notifications**, or from the CLI:
+```bash
+mc notify set desktop                       # on (use --off to switch a channel off)
+mc notify set ntfy my-private-topic         # then install the ntfy app and subscribe to that topic
+mc notify set slack https://hooks.slack.com/services/...
+mc notify mute watch                        # stop one kind (unmute to bring it back)
+mc notify test                              # sends a test to every channel that is on
+```
+Settings are global (`~/.mission-control/notify.json`, readable only by you) and apply to every project. Notes:
+- Messages include short task summaries. Only use channels you trust, and treat webhook URLs and ntfy topics as secrets (the dashboard never shows them in full).
+- The supervisor can't change these settings. Set `MC_NOTIFY=0` to silence everything for one run (for example in CI).
+- A channel that fails never affects a mission; errors go to `~/.mission-control/notify.log`.
+
 ```
 This links the folder to `~/.claude/skills/mission-control` (a symlink, or a directory junction on Windows). Nothing is copied into your projects.
 
@@ -308,3 +329,4 @@ Runner templates live in `runners.default.json`. To override or add one, create 
 
 ## License
 MIT. See `LICENSE`.
+Global, in `~/.mission-control/`: `projects.json` (the project list), `notify.json` (notification settings, private), `notify.log` (delivery errors).

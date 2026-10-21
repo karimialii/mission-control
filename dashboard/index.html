@@ -487,6 +487,7 @@ async function tick(){
     const cp = S.projects.find(p=>p.path===S.cur);
     S.st = cp && cp.initialized ? await api("/api/state?p="+encodeURIComponent(S.cur)) : null;
     if(S.view==="tokens") await loadUsage();
+    if(S.view==="comms" && !S._nBusy) S.notify=await api("/api/notify").catch(()=>S.notify);
     $("offline").style.display="none";
     render();
     if(S.drawer) refreshLog();
@@ -501,7 +502,7 @@ function render(){
   renderNav(); renderHeader();
   const v = S.view, cp = S.projects.find(p=>p.path===S.cur), splash = cp && !cp.initialized && v!=="overview";
   const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
-  if(changed("main", [splash?"ignite":v, S.cur, data])){
+  if(changed("main", [splash?"ignite":v, S.cur, data, v==="comms"?S.notify:0])){
     const act = document.activeElement, aid = act && act.id, sel = act && act.selectionStart;
     const cl=$("chatlog"), stick=!cl || cl.scrollTop+cl.clientHeight>=cl.scrollHeight-40, qsTop=$("qscroll")?.scrollTop||0;
     $("main").innerHTML = `<div class="wrap">${splash ? viewIgnite(cp) : (VIEW_FN[v]||viewPhases)()}</div>`;
@@ -832,6 +833,22 @@ function watchPanel(){
       <button class="x2" data-wcancel="${esc(w.id)}" aria-label="Stop waiting for ${esc(w.name)}" title="Stop waiting">×</button></div>`).join("")}
     ${done.map(w=>`<div class="wrow done"><span style="color:${w.reason==="done"?"var(--green)":"var(--orange)"}">${w.reason==="done"?"✓":"⚠"}</span><div style="flex:1"><span>${esc(w.name)}</span> <span class="muted" style="font-size:12px">· ${w.reason==="done"?"ready":w.reason==="failed"?"failed":"timed out"} ${ago(w.fired_at)} ago</span></div></div>`).join("")}</div>`;
 }
+function notifyPanel(){
+  const n=S.notify; if(!n) return "";
+  const ch=n.channels, field={slack:["url","Slack or Discord webhook URL"],webhook:["url","Webhook URL (receives JSON)"],ntfy:["topic","ntfy topic (phone push)"]};
+  const row=(name,label)=>{ const c=ch[name], f=field[name];
+    return `<div class="lrow"><div style="min-width:0;flex:1"><div style="font-weight:500;font-size:13.5px">${label}</div>`
+      +(f?`<div style="display:flex;gap:6px;margin-top:4px"><input class="inp" data-draft="nf-${name}" placeholder="${c.set?esc(c.hint)+" (saved; type to replace)":f[1]}" value="${esc(S.drafts["nf-"+name]||"")}"><button class="btn sm" data-nsave="${name}">Save</button></div>`
+        :`<div class="muted" style="font-size:12px">${n.available.desktop?"A system notification on this computer.":"Not supported on this system (macOS and Linux only)."}</div>`)
+      +`</div><input type="checkbox" data-nchan="${name}" aria-label="${label}" ${c.on?"checked":""} ${name==="desktop"&&!n.available.desktop?"disabled":""}></div>`; };
+  return `<div class="panel qcard"><div class="label">Notifications <span class="muted" style="font-weight:400">· all projects</span></div>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px">Get pinged when you're needed, so long runs don't wait on you. Messages include task summaries, so only use channels you trust.</p>
+    <div class="lrow"><div style="font-weight:500;font-size:13.5px">Notifications</div><input type="checkbox" data-nmaster aria-label="Notifications" ${n.enabled?"checked":""}></div>
+    ${row("desktop","Desktop")}${row("ntfy","Phone (ntfy)")}${row("slack","Slack / Discord")}${row("webhook","Webhook")}
+    <div class="label" style="margin:12px 0 4px">Tell me when</div>
+    ${Object.entries(n.kind_labels).map(([k,l])=>`<label class="lrow" style="cursor:pointer"><span style="font-size:13px">${esc(l)}</span><input type="checkbox" data-nkind="${k}" ${n.kinds[k]?"checked":""}></label>`).join("")}
+    <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn sm" id="notifyTest">Send a test</button></div></div>`;
+}
 function limitsPanel(){
   const mi=S.st.mission, sup=S.st.supervisor||{};
   const sel=(id,label,hint,cur,opts,fmtOpt)=>{ const all=[...new Set([...opts,cur].filter(x=>x!==undefined&&x!==null))].sort((a,b)=>(a===0?-1:b===0?1:a-b));
@@ -870,6 +887,7 @@ function viewComms(){
             ${watchPanel()}
       ${permPanel()}
       ${limitsPanel()}
+      ${notifyPanel()}
       <div class="panel qcard"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div class="label">Models and effort</div><button class="btn sm primary" id="saveModels">Save</button></div>
         <p class="muted" style="font-size:12.5px;margin:0 0 12px"><b>Effort</b> is how hard the model thinks before answering. Higher is more thorough on hard problems but slower and costlier. Lower is fine for routine tasks.</p>
         ${modelPicker("md-", st.runners, {sr:sp.runner||"claude-supervisor", sm:sp.model||"", se:sp.effort||"", er:st.mission.default_executor||"claude", em:st.mission.executor_model||"", ee:st.mission.executor_effort||""})}</div>
@@ -1004,7 +1022,7 @@ async function refreshLog(){
 
 /* ───────── events ───────── */
 document.addEventListener("click", async e=>{
-  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
+  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
   if(!el) return;
   try{
     if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(S.view!=="overview"){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
@@ -1028,6 +1046,10 @@ document.addEventListener("click", async e=>{
       if(!confirm(`Remove "${p.name}" from the dashboard?\n\nYour files and the Mission Control data in the project stay exactly where they are. You can add the folder again at any time.${warn}`)) return;
       await post("/api/remove-project",{p:p.path}); if(S.cur===p.path){ S.cur=null; S.view="overview"; lsSet("mc.view","overview"); } S.hashes={}; toast(`Removed "${p.name}". Its files are untouched`); await tick(); return; }
     if(el.id==="sendChat"){ return sendChat(); }
+    if(el.dataset.nsave){ const n=el.dataset.nsave, v=(S.drafts["nf-"+n]||"").trim(); if(!v) return toast("Paste the "+(n==="ntfy"?"topic":"URL")+" first",true);
+      S.notify=await post("/api/notify",{channels:{[n]:{[n==="ntfy"?"topic":"url"]:v,on:true}}}); S.drafts["nf-"+n]=""; delete S.hashes.main; toast("Saved"); render(); return; }
+    if(el.id==="notifyTest"){ const r=await post("/api/notify-test",{}); const bad=Object.entries(r.results).filter(([,v])=>v!=="ok");
+      toast(bad.length?bad.map(([k,v])=>k+": "+v).join(" · "):"Test sent via "+Object.keys(r.results).join(", "),bad.length>0); return; }
     if(el.id==="addPerm"){ const v=($("permRule")?.value||"").trim(); if(!v) return toast("Enter a rule, e.g. WebSearch",true); await post("/api/permission",{action:"add",rule:v}); S.drafts.permRule=""; toast("Allowed for this project"); await tick(); return; }
     if(el.dataset.rmperm){ await post("/api/permission",{action:"remove",rule:el.dataset.rmperm}); toast("Removed"); await tick(); return; }
     if(el.id==="ccCopy"){ try{ await navigator.clipboard.writeText(S.st.resume_cmd); toast("Copied. Paste it in a terminal to continue this chat in Claude Code"); }catch(e){ toast("Couldn't access the clipboard",true); } return; }
@@ -1092,6 +1114,9 @@ document.addEventListener("keydown", e=>{ if(e.target.id==="permRule" && e.key==
 document.addEventListener("input", e=>{ const k=e.target.dataset?.draft; if(k) S.drafts[k]=e.target.value;
   if(e.target.id==="addPath"){ const was=S._wasRepo, now=looksRepo(e.target.value); S._wasRepo=now; if(was!==now){ delete S.hashes.main; const pos=e.target.selectionStart; render(); const i=$("addPath"); if(i){ i.focus(); i.setSelectionRange(pos,pos); } } } });
 document.addEventListener("change", async e=>{ const t=e.target;
+  if(t.dataset?.nmaster!==undefined){ S.notify=await post("/api/notify",{enabled:t.checked}).catch(()=>S.notify); delete S.hashes.main; render(); return; }
+  if(t.dataset?.nchan){ S.notify=await post("/api/notify",{channels:{[t.dataset.nchan]:{on:t.checked}}}).catch(e=>{toast(e.message); return S.notify;}); delete S.hashes.main; render(); return; }
+  if(t.dataset?.nkind){ S.notify=await post("/api/notify",{kinds:{[t.dataset.nkind]:t.checked}}).catch(()=>S.notify); delete S.hashes.main; render(); return; }
   if(t.dataset?.limit){ const v=Number(t.value), k=t.dataset.limit, body={"lim-att":{max_attempts:v},"lim-bud":{budget:v},"lim-calls":{max_turns:v},"lim-sup":{sup_turns:v}}[k];
     await post("/api/limits",body).catch(()=>{}); toast("Limit saved"); await tick(); return; }
   if(t.dataset?.pick){ S.drafts[t.dataset.draft]=t.value; const sel=$(t.dataset.pick); if(sel){ S.drafts[t.dataset.pick]=""; S.drafts[t.dataset.pick.slice(0,-1)+"e"]=""; delete S.hashes.main; S.drafts[t.dataset.pick+"-x"]=""; renderPickerNow(t.dataset.pick.slice(0,3)); } }
