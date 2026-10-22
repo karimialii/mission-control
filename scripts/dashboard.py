@@ -193,7 +193,7 @@ def full_state(m: mc.Mission) -> dict:
     if sup.get("running") and not mc.pid_alive(sup.get("pid")):
         sup = mc.sup_update(m, running=False, pid=None, step="")
     resume = (f'cd "{m.root}" && PATH="{mc.ensure_mc_shim()}:$PATH" claude --resume {sup["session_id"]}' if sup.get("session_id") else "")
-    return {"mission": m.meta(), "supervisor": sup, "resume_cmd": resume, "watches": mc.watch_list(m) if mc.watches_dir(m).exists() else [], "chat": mc.chat_log(m)[-200:], "path": str(m.root), "tasks": tasks, "questions": [dict(q, perm_info=mc.perm_infos(q["permission"])) if q.get("permission") else q for q in m.questions()],
+    return {"mission": m.meta(), "supervisor": sup, "resume_cmd": resume, "watches": mc.watch_list(m) if mc.watches_dir(m).exists() else [], "chat": mc.chat_log(m)[-200:], "path": str(m.root), "tasks": tasks, "questions": [dict(q, perm_info=mc.perm_infos(q["permission"], m)) if q.get("permission") else q for q in m.questions()],
             "plan_permissions": mc.plan_permission_rules(m) if meta.get("phase") == "awaiting_approval" else [],
             "notes": m.notes()[-50:], "events": m.events()[-300:], "runners": runners,
             "ready": [t["id"] for t in mc.ready_tasks(m, tasks)], "server_time": mc.now(),

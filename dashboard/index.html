@@ -1018,7 +1018,7 @@ function supLabel(){ const sp=S.st.supervisor||{}, r=S.st.runners[sp.runner||"cl
 function riskPill(l){ return `<span class="risk ${l}">${l==="low"?"Low":l==="high"?"High":"Medium"} risk</span>`; }
 function permRows(list,checks){
   return `<div class="pc-list">${list.map(p=>`<div class="pr"><div class="pr-top"><label>${checks?`<input type="checkbox" class="pp-chk" data-rule="${esc(p.rule)}" checked>`:""}${esc(p.label)}</label>${riskPill(p.level)}</div>
-    <code>${esc(p.rule)}</code>${p.why?`<div class="muted" style="font-size:12px">${esc(p.why)}</div>`:""}<div class="pr-risk">${esc(p.risk)}</div></div>`).join("")}</div>`;
+    <code>${esc(p.rule)}</code>${p.why?`<div class="muted" style="font-size:12px">${esc(p.why)}</div>`:""}${p.outside?`<div class="pr-risk" style="color:var(--orange);font-weight:600">⚠ Runs outside the sandbox</div>`:""}<div class="pr-risk">${esc(p.risk)}</div></div>`).join("")}</div>`;
 }
 function approveBanner(){
   const st=S.st; if(!st) return "";
@@ -1366,8 +1366,8 @@ function viewComms(){
 }
 /* ── settings (per project, plus global notifications) ── */
 function accessPanel(){
-  const a=S.st.access||{}, allow=S.st.mission.permissions?.allow||[], sb=a.mode==="sandbox";
-  const bashRules=allow.filter(r=>r.startsWith("Bash(")), other=allow.filter(r=>!r.startsWith("Bash(")&&!r.startsWith("Domain("));
+  const a=S.st.access||{}, allow=S.st.mission.permissions?.allow||[], outside=S.st.mission.permissions?.outside||[], sb=a.mode==="sandbox";
+  const bashRules=allow.filter(r=>r.startsWith("Bash(")&&!outside.includes(r)), other=allow.filter(r=>!r.startsWith("Bash(")&&!r.startsWith("Domain("));
   const opt=(v,t,d)=>`<label class="mode ${(a.chosen||"sandbox")===v?"on":""}"><input type="radio" name="acc" data-access="${v}" ${(a.chosen||"sandbox")===v?"checked":""} ${v==="sandbox"&&!a.supported?"disabled":""}><div><b>${t}</b><div class="muted" style="font-size:12.5px;margin-top:2px">${d}</div></div></label>`;
   return `<div class="panel qcard"><div class="label">What agents can do</div>
     ${opt("sandbox","Full access inside the project (recommended)","The supervisor and executors run any command without asking. The operating system keeps them inside this project folder: they can't write anywhere else, can't read your keys (SSH, cloud, GitHub logins) and only reach the internet sites listed below. Snapshots let you undo anything.")}
@@ -1376,10 +1376,13 @@ function accessPanel(){
     ${sb?`<div class="label" style="margin-top:14px">Internet sites agents can reach</div>
       <div class="rules">${(a.domains||[]).map(d=>`<span class="rule"><code>${esc(d)}</code><button class="x2" data-rmdom="${esc(d)}" aria-label="Remove ${esc(d)}">×</button></span>`).join("")||'<span class="muted" style="font-size:12.5px">None: agents are offline.</span>'}</div>
       <div style="display:flex;gap:8px;margin-top:8px"><input class="inp" id="domIn" data-draft="domIn" placeholder="example.com  or  *.example.com" value="${esc(S.drafts.domIn||"")}"><button class="btn sm primary" id="addDom">Add</button><button class="btn sm" id="resetDom" title="Back to: ${esc((a.default_domains||[]).join(", "))}">Defaults</button></div>`:""}
+    ${sb&&outside.length?`<div class="label" style="margin-top:14px">Approved to run outside the sandbox</div>
+      <p class="muted" style="font-size:12px;margin:4px 0 6px">Exactly these commands run with your full access (your logins, all files, any website), because you approved them. Everything else stays inside.</p>
+      <div class="rules">${outside.map(r=>`<span class="rule"><code>${esc(r)}</code><button class="x2" data-rmperm="${esc(r)}" aria-label="Remove ${esc(r)}">×</button></span>`).join("")}</div>`:""}
     ${other.length||!sb?`<div class="label" style="margin-top:14px">${sb?"Extra tools":"Allowed commands"}</div>
       <div class="rules">${(sb?other:allow).map(r=>`<span class="rule"><code>${esc(r)}</code><button class="x2" data-rmperm="${esc(r)}" aria-label="Remove ${esc(r)}">×</button></span>`).join("")||'<span class="muted" style="font-size:12.5px">Only the defaults.</span>'}</div>`:""}
-    <div style="display:flex;gap:8px;margin-top:8px"><input class="inp" id="permRule" data-draft="permRule" placeholder="${sb?"WebSearch  or  WebFetch":"Bash(~/venvs/env/bin/python *)  or  WebSearch"}" value="${esc(S.drafts.permRule||"")}"><button class="btn sm" id="addPerm">Allow</button></div>
-    ${sb&&bashRules.length?`<div class="muted" style="font-size:12.5px;margin-top:12px;display:flex;justify-content:space-between;gap:10px;align-items:center"><span>${bashRules.length} command rule${bashRules.length===1?"":"s"} from the old mode aren't needed any more.</span><button class="btn sm" id="clearBash">Clear them</button></div>`:""}</div>`;
+    <div style="display:flex;gap:8px;margin-top:8px"><input class="inp" id="permRule" data-draft="permRule" placeholder="${sb?"WebSearch  or  Bash(gh repo create *) to run outside":"Bash(~/venvs/env/bin/python *)  or  WebSearch"}" value="${esc(S.drafts.permRule||"")}"><button class="btn sm" id="addPerm">Allow</button></div>
+    ${sb&&bashRules.length?`<div class="muted" style="font-size:12.5px;margin-top:12px;display:flex;justify-content:space-between;gap:10px;align-items:center"><span>${bashRules.length} command rule${bashRules.length===1?"":"s"} from the old mode aren't needed any more (they don't let anything out of the sandbox).</span><button class="btn sm" id="clearBash">Clear them</button></div>`:""}</div>`;
 }
 function snapPanel(){
   const sn=S.snaps; if(!sn) return `<div class="panel qcard"><div class="label">Snapshots</div><div class="muted" style="font-size:12.5px">Loading…</div></div>`;
