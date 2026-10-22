@@ -3058,7 +3058,20 @@ def cmd_git(a):
     elif a.state == "on":
         git_save(m)({"disabled": False})
         ensure_git(m)
-    print(json.dumps(m.meta().get("git") or {"enabled": False}, indent=2))
+    elif a.state == "follow":
+        if a.value not in ("on", "off"):
+            die("mc git follow on|off")
+        git_save(m)({"follow": a.value == "on"})
+        print(f"your folder {'follows' if a.value == 'on' else 'no longer follows'} the mission's approved work")
+        return
+    elif a.state == "bring":
+        # a merge commit in the user's own branch is their call; the supervisor only fast-forwards
+        okk, msg = gitops.update_folder(m, merge=os.environ.get("MC_ROLE") != "supervisor")
+        if okk:
+            m.event("note", os.environ.get("MC_ROLE") or "user", msg)
+        print(msg)
+        return
+    print(json.dumps({**(m.meta().get("git") or {"enabled": False}), "folder": gitops.folder_status(m)}, indent=2))
 
 
 def cmd_decide(a):
@@ -3573,7 +3586,8 @@ def main(argv=None):
     s.add_argument("--target", help="branch to sync with (default: the remote's default branch)")
     s.add_argument("--check", help="command that must pass afterwards, e.g. \"python3 -m unittest discover -s tests\"")
     s.add_argument("--model", help="model for the task (resolving conflicts is delicate)"); s.set_defaults(fn=cmd_sync_base)
-    s = sub.add_parser("git", help="git mode: status / on / off"); s.add_argument("state", nargs="?", choices=["on", "off", "status"], default="status")
+    s = sub.add_parser("git", help="git mode: status / on / off / bring (approved work into your folder) / follow on|off")
+    s.add_argument("state", nargs="?", choices=["on", "off", "status", "bring", "follow"], default="status"); s.add_argument("value", nargs="?", choices=["on", "off"])
     s.set_defaults(fn=cmd_git)
     s = sub.add_parser("_exec"); s.add_argument("root"); s.add_argument("task"); s.add_argument("attempt")
     s.set_defaults(fn=cmd_exec)

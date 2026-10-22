@@ -197,6 +197,7 @@ def full_state(m: mc.Mission) -> dict:
             "plan_permissions": mc.plan_permission_rules(m) if meta.get("phase") == "awaiting_approval" else [],
             "notes": m.notes()[-50:], "events": m.events()[-300:], "runners": runners,
             "ready": [t["id"] for t in mc.ready_tasks(m, tasks)], "server_time": mc.now(),
+            "folder": mc.gitops.folder_status(m) if mc.gitops.enabled(m) else {"enabled": False},
             "access": {"mode": mc.access_mode(m), "chosen": meta.get("access") or "sandbox", "supported": mc.sandbox_supported(),
                        "domains": mc.net_domains(m), "default_domains": mc.DEFAULT_DOMAINS}}
 
@@ -554,6 +555,19 @@ class Handler(BaseHTTPRequestHandler):
                     doms = [str(d).strip().lower() for d in body["domains"] if re.fullmatch(r"(\*\.)?[a-z0-9.-]+(:\d+)?", str(d).strip().lower())]
                     meta["net_domains"] = sorted(set(doms))
                 m.save_meta(meta)
+            elif u.path == "/api/folder":
+                if "follow" in body:
+                    mc.git_save(m)({"follow": bool(body["follow"])})
+                if body.get("bring"):
+                    with open(m.dir / ".merge.lock", "a") as lf:  # not while a task is being merged
+                        mc.compat.lock(lf)
+                        try:
+                            okk, msg = mc.gitops.update_folder(m, merge=True)
+                        finally:
+                            mc.compat.unlock(lf)
+                    if okk:
+                        m.event("note", "user", msg)
+                    return self._send(200 if okk else 409, {"ok": okk, "message": msg, "error": None if okk else msg})
             elif u.path == "/api/snapshot":
                 act = body.get("action")
                 if act == "toggle":
