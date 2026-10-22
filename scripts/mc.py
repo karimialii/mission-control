@@ -1798,7 +1798,7 @@ def state_text(m: Mission) -> str:
 # (resumed turn after turn). It is woken by user chat messages and by executor events.
 
 GATED_PHASES = {"briefing", "awaiting_approval"}
-SUPERVISOR_INTERESTING = {"report", "question", "answer", "error", "approved", "note", "watch"}
+SUPERVISOR_INTERESTING = {"report", "question", "answer", "error", "approved", "note", "watch", "milestone"}
 DASHBOARD_ADDENDUM = """
 
 ## You are running inside the Mission Control dashboard
