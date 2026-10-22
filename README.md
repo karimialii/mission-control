@@ -99,6 +99,23 @@ Or open the dashboard, choose **All Projects → Add a project**, paste a folder
 
 *Screenshots show the built-in simulator on demo projects.*
 
+## Work packages, milestones and phases
+Real projects are planned in rounds: you plan, build, look at the result, and plan again. Mission Control structures a mission like a research project:
+
+```
+Mission
+ └─ Work package   a large area of work ("Software brain", "Hardware"); several can run in parallel
+     └─ Milestone   one plan → build → review cycle, with a goal and "done when" criteria
+         └─ Phase   automatic: tasks that can run together (dependency order)
+             └─ Task   what one executor does
+```
+
+- **Each milestone ends with a review gate.** When its tasks are finished, the supervisor runs the full checks, writes an **outcome** (what was built, what didn't work, what it learned, open questions) and proposes the next milestone. You approve that plan in the dashboard, with the previous outcome shown above it, before anything in it runs.
+- **One open milestone per work package**, so each area moves step by step while different areas can progress side by side.
+- **Timeline and Board** show a milestone bar: click a milestone to see its tasks, goal, criteria and outcome. With a single milestone the bar stays hidden, so small missions look as before.
+- Existing missions become `WP1` / `M1.1` automatically.
+- Commands: `mc wp new --title … --goal …`, `mc milestone new --wp WP1 --title … --goal … --done-when …`, `mc milestone close M1.1 --outcome …`, `mc wp close WP1 --summary …`, `mc milestones`.
+
 ## Today: your start-of-day page
 The dashboard opens on **Today**: your to-dos, reminders, notes, the projects waiting on you, and suggestions from your inbox.
 

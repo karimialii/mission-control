@@ -182,6 +182,7 @@ def summary(path: str, info: dict) -> dict:
 
 
 def full_state(m: mc.Mission) -> dict:
+    mc.ensure_structure(m)
     tasks = m.tasks()
     levels = mc.phase_levels(tasks)
     for t in tasks:
@@ -247,6 +248,7 @@ def supervisor_loop() -> None:
                 m = mc.Mission(path)
                 mc.reap_dead(m)
                 mc.drain_launch_requests(m)
+                mc.milestones_tick(m)
                 mc.notify.drain_queue(m)
                 mc.watches_tick(m)
                 mc.ensure_attempt_limit_cards(m)

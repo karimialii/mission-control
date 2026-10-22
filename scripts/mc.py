@@ -315,6 +315,12 @@ class Mission:
 
 
 def need_mission(path=None) -> Mission:
+    m = _need_mission(path)
+    ensure_structure(m)
+    return m
+
+
+def _need_mission(path=None) -> Mission:
     root = find_root(path)
     if not root:
         die("no .mission/ here or in any parent. Run `mc.py init` first.")
@@ -361,6 +367,7 @@ def new_task(m: Mission, spec: dict, tid: str) -> dict:
         "id": tid,
         "title": spec.get("title") or tid,
         "goal": spec.get("goal", ""),
+        "milestone": spec.get("milestone") or "",
         "accept": list(spec.get("accept") or []),
         "files": list(spec.get("files") or []),
         "depends_on": list(spec.get("depends_on") or spec.get("deps") or []),
@@ -395,6 +402,9 @@ def open_questions_for(m: Mission, tid: str, kind: str | None = None) -> list:
 
 def blocked_reason(m: Mission, t: dict) -> str:
     """Why a task must not be started automatically ('' = free to run)."""
+    ms = next((x for x in (m.meta().get("milestones") or []) if x["id"] == t.get("milestone")), None)
+    if ms and ms["status"] in ("planning", "awaiting_approval"):
+        return f"{t['id']} belongs to {ms['id']}, whose plan isn't approved yet."
     used, cap = len(t.get("attempts", [])), attempt_cap(m, t)
     if used >= cap:
         return f"{t['id']} has used {used} of {cap} attempts. Change something (model, brief, split it) and ask the user to allow more."
@@ -1736,11 +1746,12 @@ def state_text(m: Mission) -> str:
              (f"Git: mission branch `{(meta.get('git') or {}).get('branch')}` (code: .mission/worktrees/_mission; base `{(meta.get('git') or {}).get('base')}`)"
               + (f" · PR {meta['git']['pr']}" if (meta.get('git') or {}).get('pr') else "")) if (meta.get("git") or {}).get("enabled")
              else "Git: off (work happens directly in the project folder)", "",
-             "## Tasks", "| id | phase | status | executor | title | summary |", "|---|---|---|---|---|---|"]
+             "## Tasks", "| id | milestone | phase | status | executor | title | summary |", "|---|---|---|---|---|---|---|"]
     for t in tasks:
         who = f"@{t.get('assignee')} (human)" if is_human(t) else t["executor"]
-        lines.append(f"| {t['id']} | {levels[t['id']] + 1} | {t['status']}{' (paused)' if t.get('paused') else ''} | "
+        lines.append(f"| {t['id']} | {t.get('milestone', '')} | {levels[t['id']] + 1} | {t['status']}{' (paused)' if t.get('paused') else ''} | "
                      f"{who} | {t['title']} | {short(t.get('summary', ''), 80)} |")
+    lines += ["", "## Work packages and milestones"] + structure_text(m)
     dec = m.dir / "decisions.md"
     if dec.exists() and dec.read_text().strip():
         lines += ["", "## Decisions", dec.read_text().strip()]
@@ -1855,7 +1866,8 @@ def needs_decision(m: Mission, events: list) -> bool:
     tasks = {t["id"]: t for t in m.tasks()}
     for e in events:
         k = e["kind"]
-        if k in ("question", "error", "note", "watch") or (k == "answer" and e.get("actor") == "user"):
+        if k in ("question", "error", "note", "watch") or (k == "answer" and e.get("actor") == "user") \
+                or (k == "milestone" and e.get("actor") == "system"):
             return True
         if k == "report" and tasks.get(e.get("task"), {}).get("status") in ("review", "blocked"):
             return True
@@ -2198,6 +2210,137 @@ def ignite(root: Path, name: str | None = None, models: dict | None = None) -> M
     return m
 
 
+# ───────────────────────────── work packages and milestones ─────────────────────────────
+# A mission holds work packages (large areas of work, which may run in parallel). Each work package
+# is a sequence of milestones: plan → build → review. Inside a milestone, phases are automatic
+# (dependency order) and tasks are what executors do. A milestone's tasks only run once its plan is
+# approved; when they're all finished it goes to "review", where the supervisor writes the outcome
+# and proposes the next milestone.
+
+MS_OPEN = ("planning", "awaiting_approval", "executing", "review")
+
+
+def ensure_structure(m: Mission) -> dict:
+    """Give older missions one work package and one milestone holding every task. Idempotent."""
+    meta = m.meta()
+    if not meta or isinstance(meta.get("wps"), list):
+        return meta
+    with m.lock():
+        meta = m.meta()
+        if isinstance(meta.get("wps"), list):
+            return meta
+        tasks = m.tasks()
+        phase = meta.get("phase", "executing")
+        sup = meta.get("supervisor") or {}
+        if phase in ("briefing",) or not tasks:
+            st = "planning"
+        elif phase == "awaiting_approval":
+            st = "awaiting_approval"
+        elif all(t["status"] in FINAL for t in tasks) and sup.get("completion_seen"):
+            st = "done"
+        else:
+            st = "executing"
+        meta["wps"] = [{"id": "WP1", "title": meta.get("name") or m.root.name, "goal": meta.get("goal", ""), "status": "active", "created": now()}]
+        meta["milestones"] = [{"id": "M1.1", "wp": "WP1", "title": "Milestone 1", "goal": meta.get("goal", ""), "done_when": [],
+                               "status": st, "created": now(), **({"outcome": "(finished before milestones existed)", "closed": now()} if st == "done" else {})}]
+        m.save_meta(meta)
+        for t in tasks:
+            if not t.get("milestone"):
+                t["milestone"] = "M1.1"
+                m.save_task(t)
+    return meta
+
+
+def milestone(m: Mission, mid: str) -> dict:
+    ms = next((x for x in ensure_structure(m).get("milestones", []) if x["id"] == mid), None)
+    if not ms:
+        die(f"no milestone {mid}. See: mc milestones")
+    return ms
+
+
+def update_milestone(m: Mission, mid: str, **kw) -> dict:
+    with m.lock():
+        meta = m.meta()
+        for x in meta.get("milestones", []):
+            if x["id"] == mid:
+                x.update(kw)
+                m.save_meta(meta)
+                return x
+    die(f"no milestone {mid}")
+
+
+def plan_target(m: Mission) -> str:
+    """Where new tasks go when the plan doesn't say: the newest milestone still being planned, else the newest running one."""
+    mss = ensure_structure(m).get("milestones", [])
+    for wanted in (("planning", "awaiting_approval"), ("executing", "review")):
+        cand = [x for x in mss if x["status"] in wanted]
+        if cand:
+            return cand[-1]["id"]
+    die("every milestone is closed. Start the next one first: mc milestone new --wp WP1 --title \"...\" --goal \"...\"")
+
+
+def needs_plan_approval(m: Mission) -> bool:
+    """Plans wait for the user when the dashboard runs the supervisor. In an external chat the user
+    talks to the supervisor directly, so it asks there."""
+    return (m.meta().get("supervisor") or {}).get("mode") == "dashboard"
+
+
+def milestones_tick(m: Mission) -> list:
+    """Move a running milestone whose tasks are all finished into review (once). Returns ids moved."""
+    meta = ensure_structure(m)
+    tasks = m.tasks()
+    moved = []
+    for x in meta.get("milestones", []):
+        if x["status"] != "executing":
+            continue
+        mine = [t for t in tasks if t.get("milestone") == x["id"]]
+        if mine and all(t["status"] in FINAL for t in mine):
+            update_milestone(m, x["id"], status="review", finished=now())
+            done = sum(1 for t in mine if t["status"] == "done")
+            m.event("milestone", "system", f"{x['id']} '{x['title']}' finished ({done} of {len(mine)} tasks done): ready for review", milestone=x["id"])
+            moved.append(x["id"])
+    return moved
+
+
+def new_milestone(m: Mission, wp: str, title: str, goal: str = "", done_when: list | None = None, by: str = "supervisor") -> dict:
+    with m.lock():
+        meta = m.meta()
+        wps = {w["id"]: w for w in meta.get("wps", [])}
+        if wp not in wps:
+            die(f"no work package {wp}. Create it: mc wp new --title \"...\" --goal \"...\"")
+        if wps[wp].get("status") == "done":
+            die(f"{wp} is closed")
+        busy = [x["id"] for x in meta.get("milestones", []) if x["wp"] == wp and x["status"] in MS_OPEN]
+        if busy:
+            die(f"{wp} still has an open milestone ({', '.join(busy)}). Close it first (mc milestone close {busy[0]} --outcome \"...\"); "
+                "a work package works on one milestone at a time")
+        n = 1 + sum(1 for x in meta.get("milestones", []) if x["wp"] == wp)
+        ms = {"id": f"M{wp[2:]}.{n}", "wp": wp, "title": title, "goal": goal, "done_when": list(done_when or []),
+              "status": "planning", "created": now()}
+        meta.setdefault("milestones", []).append(ms)
+        m.save_meta(meta)
+    m.event("milestone", by, f"{ms['id']} '{title}' started in {wp}: planning", milestone=ms["id"])
+    return ms
+
+
+def structure_text(m: Mission) -> list:
+    """For STATE.md and `mc milestones`: the tree, with each finished milestone's outcome."""
+    meta = ensure_structure(m)
+    tasks = m.tasks()
+    out = []
+    for w in meta.get("wps", []):
+        out.append(f"- **{w['id']} {w['title']}** ({w['status']})" + (f": {w['goal']}" if w.get("goal") else "") + (f" · summary: {w['summary']}" if w.get("summary") else ""))
+        for x in [x for x in meta.get("milestones", []) if x["wp"] == w["id"]]:
+            mine = [t for t in tasks if t.get("milestone") == x["id"]]
+            done = sum(1 for t in mine if t["status"] == "done")
+            out.append(f"  - {x['id']} {x['title']} · {x['status']} · {done}/{len(mine)} tasks done" + (f" · goal: {x['goal']}" if x.get("goal") else ""))
+            if x.get("done_when"):
+                out.append("    done when: " + "; ".join(x["done_when"]))
+            if x.get("outcome"):
+                out.append("    outcome: " + x["outcome"])
+    return out
+
+
 def approve_plan(m: Mission, by: str, allow: list | None = None) -> list:
     """Approve the plan. `allow` (user only) is the list of permissions from the plan's preflight card that the
     user ticked: they're granted in the same step, so the executors don't stop to ask later."""
@@ -2205,11 +2348,17 @@ def approve_plan(m: Mission, by: str, allow: list | None = None) -> list:
     if by == "user" and allow:
         wanted = {x["rule"] for x in plan_permission_rules(m)}
         granted = perm_add(m, [r for r in allow if r in wanted], "user")
+    ensure_structure(m)
     meta = m.meta()
+    started = [x["id"] for x in meta.get("milestones", []) if x["status"] in ("planning", "awaiting_approval")
+               and any(t.get("milestone") == x["id"] for t in m.tasks())]
+    for x in meta.get("milestones", []):
+        if x["id"] in started:
+            x.update(status="executing", approved=now())
     meta.update(phase="executing", autopilot=True)
     meta.pop("plan_permissions", None)
     m.save_meta(meta)
-    m.event("approved", by, "plan approved: launching" + (f" (allowed: {', '.join(granted)})" if granted else ""))
+    m.event("approved", by, "plan approved" + (f" ({', '.join(started)})" if started else "") + ": launching" + (f" (allowed: {', '.join(granted)})" if granted else ""))
     if by == "user":
         chat_add(m, "system", "✓ Plan approved." + (f" Allowed: {', '.join(granted)}." if granted else "") + " Executors are launching.")
     return schedule(m)
@@ -2249,6 +2398,17 @@ def cmd_plan(a):
     bad = [d["rule"] for d in declared if not perm_valid(d["rule"])]
     if bad:
         die(f"not valid permission rules: {bad}. Use e.g. 'Bash(/path/to/python *)' or 'WebSearch'")
+    ensure_structure(m)
+    target = data.get("milestone") if isinstance(data, dict) else None
+    if isinstance(target, dict):  # create the next milestone in the same call
+        target = new_milestone(m, target.get("wp") or "WP1", target.get("title") or "Next milestone", target.get("goal", ""),
+                               target.get("done_when") or [])["id"]
+    target = target or getattr(a, "milestone", None) or plan_target(m)
+    ms = milestone(m, target)
+    if ms["status"] == "done":
+        die(f"{target} is closed. Plan into a new milestone: mc milestone new ...")
+    for spec in specs:
+        spec.setdefault("milestone", target)
     keymap = {t["id"]: t["id"] for t in m.tasks()}
     created = []
     with m.lock():
@@ -2266,7 +2426,12 @@ def cmd_plan(a):
                 die(f"{t['id']} depends on unknown {missing}")
             t["depends_on"] = [keymap[d] for d in deps]
             m.save_task(t)
-    m.event("plan", "supervisor", f"planned {len(created)} tasks")
+    m.event("plan", "supervisor", f"planned {len(created)} tasks in {target}", milestone=target)
+    if ms["status"] == "planning":
+        gated = needs_plan_approval(m) or m.meta().get("phase") in GATED_PHASES
+        update_milestone(m, target, status="awaiting_approval" if gated else "executing", **({} if gated else {"approved": now()}))
+        if gated and m.meta().get("phase") not in GATED_PHASES:
+            print(f"plan saved in {target}. It waits for the user's approval in the dashboard; nothing in it runs until then.")
     meta = m.meta()
     if declared:
         meta["plan_permissions"] = declared + [d for d in (meta.get("plan_permissions") or []) if d.get("rule") not in {x["rule"] for x in declared}]
@@ -2282,9 +2447,11 @@ def cmd_plan(a):
 
 def cmd_add(a):
     m = need_mission()
+    target = a.milestone or plan_target(m)
+    milestone(m, target)
     with m.lock():
         tid = m.next_id("T", "tasks")
-        m.save_task(new_task(m, {"title": a.title, "goal": a.goal, "accept": a.accept, "files": a.files,
+        m.save_task(new_task(m, {"title": a.title, "goal": a.goal, "accept": a.accept, "files": a.files, "milestone": target,
                                  "depends_on": a.deps, "executor": a.executor, "estimate": a.estimate,
                                  "check": a.check, "model": a.model}, tid))
     m.event("task_added", "supervisor", f"{tid} added: {a.title}", task=tid)
@@ -2911,6 +3078,12 @@ def inbox_items(m: Mission, mark_read: bool) -> list:
                 if mark_read:
                     w["seen"] = True
                     watch_save(m, w)
+    milestones_tick(m)
+    for x in m.meta().get("milestones", []):
+        if x["status"] == "review":
+            items.append(f"MILESTONE {x['id']} '{x['title']}' is finished: review it. Run the full checks, then "
+                         f"`mc milestone close {x['id']} --outcome \"<what was built, what didn't work, what you learned, open questions>\"`, "
+                         "and propose what comes next (a plan with a new \"milestone\", or `mc wp close` if the work package is done).")
     for t in m.tasks():
         if t["status"] == "review":
             last = (t.get("attempts") or [{}])[-1]
@@ -3043,8 +3216,62 @@ def cmd_goal(a):
     m.event("decision", "supervisor", f"goal: {short(meta['goal'], 150)}")
 
 
+def cmd_wp(a):
+    m = need_mission()
+    if a.action == "new":
+        if not a.title:
+            die("give it a --title")
+        with m.lock():
+            meta = m.meta()
+            wid = f"WP{1 + len(meta.get('wps', []))}"
+            meta["wps"].append({"id": wid, "title": a.title, "goal": a.goal or "", "status": "active", "created": now()})
+            m.save_meta(meta)
+        m.event("milestone", os.environ.get("MC_ROLE") or "user", f"work package {wid} '{a.title}' added")
+        print(f"{wid} added. Start its first milestone: mc milestone new --wp {wid} --title \"...\" --goal \"...\"")
+    elif a.action == "close":
+        open_ms = [x["id"] for x in m.meta().get("milestones", []) if x["wp"] == a.id and x["status"] in MS_OPEN]
+        if open_ms:
+            die(f"{a.id} still has open milestones: {', '.join(open_ms)}")
+        with m.lock():
+            meta = m.meta()
+            w = next((w for w in meta["wps"] if w["id"] == a.id), None)
+            if not w:
+                die(f"no work package {a.id}")
+            w.update(status="done", summary=a.summary or "", closed=now())
+            m.save_meta(meta)
+        m.event("milestone", os.environ.get("MC_ROLE") or "user", f"work package {a.id} closed" + (f": {short(a.summary, 140)}" if a.summary else ""))
+        print(f"{a.id} closed")
+    else:
+        print("\n".join(structure_text(m)))
+
+
+def cmd_milestone(a):
+    m = need_mission()
+    if a.action == "new":
+        if not a.title:
+            die("give it a --title")
+        ms = new_milestone(m, a.wp or "WP1", a.title, a.goal or "", a.done_when or [], os.environ.get("MC_ROLE") or "user")
+        print(f"{ms['id']} created in {ms['wp']}. Plan its tasks: mc plan - (they go into {ms['id']})")
+    elif a.action == "close":
+        ms = milestone(m, a.id)
+        mine = [t for t in m.tasks() if t.get("milestone") == a.id]
+        left = [t["id"] for t in mine if t["status"] not in FINAL]
+        if left:
+            die(f"{a.id} still has unfinished tasks: {', '.join(left)}. Finish or cancel them first")
+        if not (a.outcome or "").strip():
+            die("write the outcome: --outcome \"what was built, what didn't work, what you learned, open questions\"")
+        update_milestone(m, a.id, status="done", outcome=a.outcome.strip(), closed=now())
+        m.event("milestone", os.environ.get("MC_ROLE") or "user", f"{a.id} '{ms['title']}' closed · {short(a.outcome, 160)}", milestone=a.id)
+        cmd_checkpoint(a)
+        print(f"{a.id} closed. Next: plan the next milestone (a plan with \"milestone\": {{\"wp\": \"{ms['wp']}\", \"title\": ...}}) or close {ms['wp']}.")
+    else:
+        print("\n".join(structure_text(m)))
+
+
 def cmd_approve(a):
     m = need_mission()
+    if os.environ.get("MC_ROLE") == "supervisor":
+        die("plans are approved by the user in the dashboard. Tell them the plan is ready and end your turn.")
     print("launched: " + (", ".join(approve_plan(m, "supervisor")) or "nothing ready"))
 
 
@@ -3184,8 +3411,16 @@ def main(argv=None):
     s.add_argument("--executor-model", help="e.g. haiku, sonnet, a Gemini/OpenAI model id")
     s.set_defaults(fn=cmd_init)
 
-    s = sub.add_parser("plan", help="create many tasks from JSON ({tasks:[...]}); '-' reads stdin")
-    s.add_argument("file"); s.set_defaults(fn=cmd_plan)
+    s = sub.add_parser("plan", help="create many tasks from JSON ({tasks:[...]}, optional \"milestone\"); '-' reads stdin")
+    s.add_argument("file"); s.add_argument("--milestone", help="the milestone the tasks belong to (default: the one being planned)")
+    s.set_defaults(fn=cmd_plan)
+    s = sub.add_parser("wp", help="work packages: list / new --title --goal / close WP2 --summary")
+    s.add_argument("action", nargs="?", choices=["list", "new", "close"], default="list"); s.add_argument("id", nargs="?")
+    s.add_argument("--title"); s.add_argument("--goal"); s.add_argument("--summary"); s.set_defaults(fn=cmd_wp)
+    s = sub.add_parser("milestone", aliases=["milestones"], help="milestones: list / new --wp WP1 --title --goal --done-when ... / close M1.2 --outcome")
+    s.add_argument("action", nargs="?", choices=["list", "new", "close"], default="list"); s.add_argument("id", nargs="?")
+    s.add_argument("--wp"); s.add_argument("--title"); s.add_argument("--goal"); s.add_argument("--done-when", nargs="*")
+    s.add_argument("--outcome"); s.set_defaults(fn=cmd_milestone)
 
     s = sub.add_parser("add", help="add one task")
     s.add_argument("--title", required=True); s.add_argument("--goal", default="")
@@ -3193,6 +3428,7 @@ def main(argv=None):
     s.add_argument("--deps", nargs="*", default=[]); s.add_argument("--executor")
     s.add_argument("--estimate", type=int, default=2); s.add_argument("--check", default="")
     s.add_argument("--model", default="", help="override the executor model for this task")
+    s.add_argument("--milestone", help="default: the milestone being planned, else the running one")
     s.set_defaults(fn=cmd_add)
 
     s = sub.add_parser("set", help="edit task fields: set T-001 executor=claude-sonnet estimate=3")

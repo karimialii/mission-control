@@ -433,6 +433,22 @@ code{font-family:var(--mono);font-size:.92em}
 .st-M{color:var(--orange);background:color-mix(in srgb,var(--orange) 14%,transparent)}
 .st-D{color:var(--red);background:color-mix(in srgb,var(--red) 14%,transparent)}
 .st-A{color:var(--green);background:color-mix(in srgb,var(--green) 14%,transparent)}
+/* ── milestones ── */
+.msbar{background:var(--panel);border-radius:var(--r);box-shadow:var(--shadow);padding:12px 16px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px}
+.msrow{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.mswp{font-size:12.5px;color:var(--mute);min-width:150px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mswp b{color:var(--text)}
+.mspills{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.mspill{display:inline-flex;align-items:center;gap:7px;border:0;background:var(--fill2);color:var(--text);border-radius:980px;padding:5px 12px 5px 9px;font:500 12.5px var(--ui);cursor:pointer;max-width:320px}
+.mspill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mspill em{font-style:normal;color:var(--mute);font-size:11.5px}
+.mspill i{font-style:normal;font-size:11px;width:14px;text-align:center}
+.mspill.on{box-shadow:0 0 0 1.5px var(--blue);background:color-mix(in srgb,var(--blue) 10%,var(--panel))}
+.mspill.s-done i{color:var(--green)} .mspill.s-executing i{color:var(--blue)} .mspill.s-review i{color:var(--purple)} .mspill.s-awaiting_approval i,.mspill.s-planning i{color:var(--orange)}
+.mscard{background:var(--panel);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 18px;margin-bottom:14px;border-left:4px solid var(--blue)}
+.mscard.s-done{border-left-color:var(--green)} .mscard.s-review{border-left-color:var(--purple)} .mscard.s-awaiting_approval,.mscard.s-planning{border-left-color:var(--orange)}
+.msbadge{font:600 11px var(--ui);text-transform:uppercase;letter-spacing:.04em;color:var(--mute)}
+.msout{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:13px}
 /* ── calendar page ── */
 .calbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px}
 .caltitle{margin:0;font:400 28px/1.1 var(--display);letter-spacing:-.02em;flex:1;min-width:220px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
@@ -673,7 +689,7 @@ function changed(key, data){ const h=JSON.stringify(data); if(S.hashes[key]===h)
 function render(){
   renderNav(); renderHeader();
   const v = S.view, cp = S.projects.find(p=>p.path===S.cur), splash = cp && !cp.initialized && !GLOBAL.has(v);
-  const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="calendar" ? [S.calMode,S.calA,S.calData,S.calEvt?.uid,S.calEvt?.start] : v==="today" ? [S.today, S.calDay, S.calEvt?.uid, S.calEvt?.start, S.projects.map(p=>[p.name,p.needs_you,p.phase,p.counts])] : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
+  const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="phases"||v==="board" ? [S.st?.tasks,S.st?.mission,S.ms,S.st?.plan_permissions,S.cur] : v==="calendar" ? [S.calMode,S.calA,S.calData,S.calEvt?.uid,S.calEvt?.start] : v==="today" ? [S.today, S.calDay, S.calEvt?.uid, S.calEvt?.start, S.projects.map(p=>[p.name,p.needs_you,p.phase,p.counts])] : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
   if(changed("main", [splash?"ignite":v, S.cur, data, v==="settings"?[S.notify,S.snaps,S.snapOpen,S.snapChanges,S.st?.access,S.st?.mission,S.st?.supervisor]:0])){
     const act = document.activeElement, aid = act && act.id, sel = act && act.selectionStart;
     const cl=$("chatlog"), stick=!cl || S.chatBottom || cl.scrollTop+cl.clientHeight>=cl.scrollHeight-60, clTop=cl?.scrollTop||0, sideTop=document.querySelector(".side")?.scrollTop||0, doneTop=document.querySelector(".tdone")?.scrollTop||0, calTop=$("calScroll")?.scrollTop, qsTop=$("qscroll")?.scrollTop||0;
@@ -778,9 +794,41 @@ function schedule(tasks){
   while(cur.length){ const nx=[]; cur.forEach(id=>{ if(crit.has(id)) return; crit.add(id); (by[id].depends_on||[]).forEach(d=>{ if(by[d]&&end[d]===start[id]) nx.push(d); }); }); cur=nx; }
   return {start,end,total,crit};
 }
+/* ── work packages and milestones ── */
+const MS_LABEL={planning:"Planning",awaiting_approval:"Awaiting approval",executing:"Running",review:"In review",done:"Done"};
+const MS_ICON={planning:"○",awaiting_approval:"◔",executing:"▶",review:"◎",done:"✓"};
+function msAll(st){ return st.mission.milestones||[]; }
+function msMany(st){ return msAll(st).length>1||(st.mission.wps||[]).length>1; }
+function msCurrent(st){
+  const all=msAll(st); if(!all.length) return null;
+  if(S.ms&&(S.ms==="all"||all.some(x=>x.id===S.ms))) return S.ms;
+  for(const want of [["review"],["executing"],["awaiting_approval","planning"]]){ const x=all.find(m=>want.includes(m.status)); if(x) return x.id; }
+  return all[all.length-1].id;
+}
+function msTasks(st, allowAll){
+  const cur=msCurrent(st); if(!msMany(st)||!cur||(allowAll&&cur==="all")) return st.tasks;
+  const mine=st.tasks.filter(t=>(t.milestone||"M1.1")===cur), ids=new Set(mine.map(t=>t.id)), memo={};
+  const lvl=t=>memo[t.id]??=((t.depends_on||[]).filter(d=>ids.has(d)).map(d=>lvl(mine.find(x=>x.id===d))).reduce((a,b)=>Math.max(a,b+1),0));
+  return mine.map(t=>({...t,phase:lvl(t)}));   // phases restart inside each milestone
+}
+function msBar(st, allowAll){
+  if(!msMany(st)) return "";
+  const cur=msCurrent(st), wps=st.mission.wps||[], ms=msAll(st);
+  const rows=wps.map(w=>`<div class="msrow"><div class="mswp"><b>${esc(w.id)}</b> ${esc(w.title)}${w.status==="done"?' <span class="tag">closed</span>':""}</div><div class="mspills">${
+    ms.filter(x=>x.wp===w.id).map(x=>{ const n=st.tasks.filter(t=>(t.milestone||"M1.1")===x.id), d=n.filter(t=>t.status==="done").length;
+      return `<button class="mspill s-${x.status} ${cur===x.id?"on":""}" data-ms="${esc(x.id)}" title="${esc(MS_LABEL[x.status]||x.status)}"><i>${MS_ICON[x.status]||"·"}</i><span><b>${esc(x.id)}</b> ${esc(x.title)}</span><em>${d}/${n.length}</em></button>`; }).join("")||'<span class="muted" style="font-size:12px">No milestone yet</span>'}</div></div>`).join("");
+  const sel=ms.find(x=>x.id===cur);
+  const card=sel?`<div class="mscard s-${sel.status}"><div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><span class="msbadge">${MS_ICON[sel.status]} ${esc(MS_LABEL[sel.status]||sel.status)}</span><b style="font-size:15px">${esc(sel.id)} · ${esc(sel.title)}</b></div>
+      ${sel.goal?`<div style="font-size:13px;margin-top:6px">${esc(sel.goal)}</div>`:""}
+      ${sel.done_when?.length?`<div class="muted" style="font-size:12.5px;margin-top:4px">Done when: ${sel.done_when.map(esc).join(" · ")}</div>`:""}
+      ${sel.status==="review"?`<div style="font-size:12.5px;margin-top:8px;color:var(--purple)">All tasks are finished. The supervisor is checking the result and will write the outcome, then propose what comes next.</div>`:""}
+      ${sel.outcome?`<div class="msout"><div class="label">Outcome</div>${md(sel.outcome)}</div>`:""}</div>`:"";
+  return `<div class="msbar">${rows}${allowAll?`<button class="mspill ${cur==="all"?"on":""}" data-ms="all" style="margin-top:6px"><span>All milestones</span></button>`:""}</div>${cur==="all"?"":card}`;
+}
 function viewPhases(){
   const st=S.st; if(!st) return head("Timeline","")+noMission();
-  const tasks=st.tasks.filter(t=>t.status!=="cancelled");
+  const tasks=msTasks(st).filter(t=>t.status!=="cancelled");
+  if(!tasks.length && msMany(st)) return head("Timeline","")+approveBanner()+msBar(st)+`<div class="empty">No tasks planned in this milestone yet.</div>`;
   if(!tasks.length) return head("Timeline","")+`<div class="empty">No plan yet. ${st.mission.phase==="briefing"?'Your supervisor is in its briefing. Tell it your goal in <a href="#" data-view="comms">Chat</a>.':"The supervisor hasn't planned any tasks yet."}</div>`;
   const {start,end,total,crit}=schedule(tasks);
   const phases={}; tasks.forEach(t=>(phases[t.phase]=phases[t.phase]||[]).push(t));
@@ -819,7 +867,7 @@ function viewPhases(){
     return `<div class="panel phase-chip"><div class="label">Phase ${l+1}</div><div style="display:flex;align-items:baseline;gap:8px;margin-top:2px"><span class="n">${d}/${ts_.length}</span><span class="muted" style="font-size:12px">done</span></div><div class="bar"><i style="width:${d/ts_.length*100}%;background:var(--green)"></i></div></div>`; }).join("");
   return head("Timeline", "Tasks that can run in parallel start together. Dependent tasks start after the tasks they wait for.",
       `<div class="gstats"><span class="tag">${tasks.length} tasks</span><span class="tag">${levels.length} phases</span><span class="tag">up to ${maxPar} in parallel</span><span class="tag" style="color:var(--crit)">critical path: ${crit.size} tasks</span></div>`)
-    + approveBanner() + prBanner() + `<div class="phase-strip">${strip}</div><div class="panel gantt-wrap">${svg}</div>
+    + approveBanner() + prBanner() + msBar(st) + `<div class="phase-strip">${strip}</div><div class="panel gantt-wrap">${svg}</div>
     <div class="legend">${STATUS.map(s=>`<span><i style="background:${SCOL(s)}"></i>${SLABEL[s]}</span>`).join("")}<span><i style="background:var(--crit)"></i>Critical path</span><span>Columns are estimate points</span></div>`;
 }
 const cssCache={}; function getCss(v){ return cssCache[v] ??= (getComputedStyle(document.documentElement).getPropertyValue(v).trim().startsWith("var(") ? getCss(getComputedStyle(document.documentElement).getPropertyValue(v).trim().slice(4,-1)) : getComputedStyle(document.documentElement).getPropertyValue(v).trim()); }
@@ -829,8 +877,9 @@ const trunc=(s,n)=>s.length>n?s.slice(0,n-1)+"…":s;
 function viewBoard(){
   const st=S.st; if(!st) return head("Board","")+noMission();
   const deps = t => (t.depends_on||[]).filter(d=>st.tasks.find(x=>x.id===d)?.status!=="done");
-  return head("Board", "Every task by status. Open a card for its live transcript, report and tokens.") + `<div class="board">` + STATUS.map(s=>{
-    const items=st.tasks.filter(t=>t.status===s);
+  const bt=msTasks(st,true);
+  return head("Board", "Every task by status. Open a card for its live transcript, report and tokens.") + msBar(st,true) + `<div class="board">` + STATUS.map(s=>{
+    const items=bt.filter(t=>t.status===s);
     return `<div class="panel col"><div class="col-h"><b><i class="cdot" style="background:${SCOL(s)}"></i>${SLABEL[s]}</b><span>${items.length}</span></div>` + items.map(t=>{
       const waiting=deps(t), ready=st.ready.includes(t.id);
       return `<div class="card ${t.status}" data-task="${t.id}">
@@ -972,10 +1021,16 @@ function permRows(list,checks){
     <code>${esc(p.rule)}</code>${p.why?`<div class="muted" style="font-size:12px">${esc(p.why)}</div>`:""}<div class="pr-risk">${esc(p.risk)}</div></div>`).join("")}</div>`;
 }
 function approveBanner(){
-  const st=S.st; if(st?.mission.phase!=="awaiting_approval") return "";
-  const n=st.tasks.filter(t=>t.status!=="cancelled").length, ph=new Set(st.tasks.map(t=>t.phase)).size, pp=st.plan_permissions||[];
+  const st=S.st; if(!st) return "";
+  const waiting=msAll(st).filter(x=>x.status==="awaiting_approval");
+  if(st.mission.phase!=="awaiting_approval"&&!waiting.length) return "";
+  const ids=new Set(waiting.map(x=>x.id)), pt=waiting.length?st.tasks.filter(t=>ids.has(t.milestone||"M1.1")&&t.status!=="cancelled"):st.tasks.filter(t=>t.status!=="cancelled");
+  const n=pt.length, ph=new Set(pt.map(t=>t.phase)).size, pp=st.plan_permissions||[];
+  const prev=waiting.map(w=>msAll(st).filter(x=>x.wp===w.wp&&x.status==="done").pop()).filter(Boolean);
+  const which=msMany(st)&&waiting.length?`<div style="font-size:13px;margin-top:6px">${waiting.map(w=>`<b>${esc(w.id)} ${esc(w.title)}</b>${w.goal?" · "+esc(w.goal):""}`).join("<br>")}</div>`+
+    (prev.length?`<details style="margin-top:6px"><summary class="muted" style="font-size:12.5px;cursor:pointer">What the previous milestone found</summary>${prev.map(x=>`<div style="font-size:12.5px;margin-top:4px"><b>${esc(x.id)}</b> ${md(x.outcome||"")}</div>`).join("")}</details>`:""):"";
   return `<div class="panel approve"><div><div class="label" style="color:var(--cyan)">Plan ready for launch</div>
-    <div style="font-size:15px;font-weight:600;margin-top:4px">${n} tasks · ${ph} phase${ph>1?"s":""} · nothing runs until you approve</div>
+    <div style="font-size:15px;font-weight:600;margin-top:4px">${n} tasks · ${ph} phase${ph>1?"s":""} · nothing runs until you approve</div>${which}
     <div class="muted" style="font-size:12.5px">Check the timeline in <a href="#" data-view="phases">Phases</a>. Want changes? Just tell the supervisor in chat.</div></div>
     <button class="btn primary launch" id="approveBtn">✓ ${pp.length?"Approve, allow & launch":"Approve & launch"}</button>
     ${pp.length?`<div class="approve-perms"><div class="label">This plan needs ${pp.length} permission${pp.length>1?"s":""} · untick any you don't want to give</div>${permRows(pp,true)}</div>`:""}</div>`;
@@ -1479,7 +1534,7 @@ async function refreshLog(){
 
 /* ───────── events ───────── */
 document.addEventListener("click", async e=>{
-  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-calday],[data-calmode],[data-calnav],[data-calgo],[data-calday-go],[data-ev],[data-evclose],[data-evtodo],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
+  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-ms],[data-calday],[data-calmode],[data-calnav],[data-calgo],[data-calday-go],[data-ev],[data-evclose],[data-evtodo],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
   if(!el) return;
   try{
     if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(S.view==="comms") S.chatBottom=true; if(!GLOBAL.has(S.view)){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
@@ -1504,6 +1559,7 @@ document.addEventListener("click", async e=>{
       await post("/api/remove-project",{p:p.path}); if(S.cur===p.path){ S.cur=null; S.view="overview"; lsSet("mc.view","overview"); } S.hashes={}; toast(`Removed "${p.name}". Its files are untouched`); await tick(); return; }
     if(el.id==="sendChat"){ return sendChat(); }
     if(el.dataset.tact){ await todayAct(el); return; }
+    if(el.dataset.ms){ S.ms=el.dataset.ms; delete S.hashes.main; render(); return; }
     if(el.dataset.ev){ if(e.target.closest("a[href]")) return; const o=findEv(el.dataset.ev); if(o){ S.calEvt=o; delete S.hashes.main; render(); } return; }
     if(el.dataset.evclose!==undefined){ S.calEvt=null; delete S.hashes.main; render(); return; }
     if(el.dataset.evtodo!==undefined){ const o=S.calEvt; await post("/api/today/add",{text:"Prepare for: "+o.title,due:o.start.slice(0,10)}); S.calEvt=null; toast("Added to your to-dos"); delete S.hashes.main; render(); return; }

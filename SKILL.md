@@ -24,8 +24,14 @@ All state lives in `<project>/.mission/`. The user watches everything live in th
 - Existing mission (or "resume mission"): `MC status`, then `MC inbox`.
 - Tell the user they can watch at the dashboard: `MC dashboard --open` (one dashboard serves all projects at http://127.0.0.1:7777).
 
-## 2 · Plan
-Explore just enough of the codebase to cut the work well. Then write the whole plan in one call:
+## Structure: work packages → milestones → phases → tasks
+- **Work package** (`WP1`, `WP2`…): a large area of work with its own goal ("Software brain", "Hardware"). They may progress in parallel. Create one only for a genuinely separate area: `MC wp new --title "..." --goal "..."`. Close it when its goal is met: `MC wp close WP2 --summary "..."`.
+- **Milestone** (`M1.1`, `M1.2`…): one plan → build → **review** cycle inside a work package, with a goal and "done when" criteria. A work package has at most one open milestone. **This is where re-planning happens:** never re-plan a whole mission in place; finish the milestone, review it, and plan the next one from what you learned.
+- **Phases** are automatic: the dependency order of tasks inside a milestone. Don't plan them by hand.
+- **Tasks** are what executors do, as before.
+- Every mission starts with `WP1` / `M1.1`. Small missions never need more; the dashboard hides the structure until there is a second milestone or work package. `MC milestones` shows the tree with each milestone's outcome.
+
+Explore just enough of the codebase to cut the work well. Then write the whole plan in one call: (the tasks go into the milestone being planned; to start the next milestone in the same call, add `"milestone": {"wp": "WP1", "title": "...", "goal": "...", "done_when": ["..."]}` to the JSON)
 
 ```bash
 MC plan - <<'EOF'
@@ -75,6 +81,13 @@ After 3 failed attempts on the same task, stop retrying. Split it, rewrite the b
 - If the decision blocks everything, also ask it in chat and wait. Otherwise keep working on other tasks.
 - Status updates in chat are short: what finished, what's running, and what you need. The dashboard has the details.
 
+## 5½ · Milestone review gate
+When every task in a milestone is finished, the milestone moves to **review** and your inbox shows `MILESTONE M1.x ... is finished`. Then:
+1. **Verify the whole milestone**: run the full test suite or build, check its "done when" criteria, and fix small gaps (or add a final task to it).
+2. **Write the outcome**: `MC milestone close M1.x --outcome "<what was built · what didn't work · what you learned · open questions>"`. Keep it to a few lines: the next plan starts from it, and the user reads it.
+3. **Propose what comes next** in chat, in plain words, then write the next milestone's plan (`MC plan -` with a `"milestone"` object). In the dashboard it waits for the user's approval, together with the previous outcome. If the work package's goal is met, close it instead (`MC wp close`).
+Don't start the next milestone's work before its plan is approved (`MC approve` is the user's, not yours).
+
 ## 6 · Finish
 When every task is done, verify the whole: run the full test suite or build, and check that the pieces integrate. Then fix the gaps with a final task or yourself. Run `MC checkpoint` and give the user a short summary: what was built, the decisions made, and the total executor cost (from `MC status`).
 
@@ -122,4 +135,4 @@ The user can be pinged (desktop, phone via ntfy, Slack/Discord, webhook) when a 
 The dashboard's **Today** page holds the user's personal to-dos, reminders and inbox suggestions (`~/.mission-control/today/`). It is theirs: don't read or edit it unless they ask.
 
 ## Command cheat-sheet
-`init · plan · add · set · assign · sync-base · watch · request-model · request-permission · allow · notify · models · goal · approve · status · diff · sync · pr · git · done · checkpoint · brief · run · stop · cancel · wait · inbox · review · answer · ask · decide · note · autopilot · projects · dashboard`. Run `MC <cmd> -h` for flags.
+`init · plan · wp · milestone · add · set · assign · sync-base · watch · request-model · request-permission · allow · notify · models · goal · approve · status · diff · sync · pr · git · done · checkpoint · brief · run · stop · cancel · wait · inbox · review · answer · ask · decide · note · autopilot · projects · dashboard`. Run `MC <cmd> -h` for flags.
