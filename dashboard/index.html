@@ -460,6 +460,8 @@ code{font-family:var(--mono);font-size:.92em}
 .conf.low{background:color-mix(in srgb,var(--pink) 16%,transparent);color:var(--pink)}
 .ibtn{border:0;background:var(--panel);color:var(--text);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;flex:none}
 .ibtn.ok{color:var(--green)} .ibtn:hover{background:var(--fill)}
+.tdone{overflow-y:auto;overscroll-behavior:contain}
+.tdone .trow:first-child{border-top:0}
 .tnotes{width:100%;min-height:120px;resize:vertical}
 .needrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);cursor:pointer}
 .needrow:first-of-type{border-top:0}
@@ -574,10 +576,11 @@ function render(){
   const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="today" ? [S.today, S.projects.map(p=>[p.name,p.needs_you,p.phase,p.counts])] : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
   if(changed("main", [splash?"ignite":v, S.cur, data, v==="settings"?[S.notify,S.snaps,S.snapOpen,S.snapChanges,S.st?.access,S.st?.mission,S.st?.supervisor]:0])){
     const act = document.activeElement, aid = act && act.id, sel = act && act.selectionStart;
-    const cl=$("chatlog"), stick=!cl || S.chatBottom || cl.scrollTop+cl.clientHeight>=cl.scrollHeight-60, clTop=cl?.scrollTop||0, sideTop=document.querySelector(".side")?.scrollTop||0, qsTop=$("qscroll")?.scrollTop||0;
+    const cl=$("chatlog"), stick=!cl || S.chatBottom || cl.scrollTop+cl.clientHeight>=cl.scrollHeight-60, clTop=cl?.scrollTop||0, sideTop=document.querySelector(".side")?.scrollTop||0, doneTop=document.querySelector(".tdone")?.scrollTop||0, qsTop=$("qscroll")?.scrollTop||0;
     $("main").innerHTML = `<div class="wrap">${splash ? viewIgnite(cp) : (VIEW_FN[v]||viewPhases)()}</div>`;
     const ncl=$("chatlog"); if(ncl){ if(stick){ ncl.scrollTop=ncl.scrollHeight; requestAnimationFrame(()=>{ ncl.scrollTop=ncl.scrollHeight; }); } else ncl.scrollTop=clTop; S.chatBottom=false; updateJump(); }
     const nside=document.querySelector(".side"); if(nside) nside.scrollTop=sideTop;
+    if(document.querySelector(".tdone")) requestAnimationFrame(()=>{ capDone(); const b=document.querySelector(".tdone"); if(b) b.scrollTop=doneTop; });
     const cb=$("chat-box"); if(cb) growBox(cb);
     if($("qscroll")) $("qscroll").scrollTop=qsTop;
     if(v==="agents") hydrateTerms();
@@ -938,7 +941,7 @@ function viewToday(){
   const now=T.now, day=now.slice(0,10), hr=+now.slice(11,13);
   const hello=hr<12?"Good morning":hr<18?"Good afternoon":"Good evening";
   const open=T.items.filter(i=>!i.done), todos=open.filter(i=>!i.remind_at), rem=open.filter(i=>i.remind_at).sort((a,b)=>a.remind_at.localeCompare(b.remind_at));
-  const doneToday=T.items.filter(i=>i.done&&(i.done_at||"").startsWith(day));
+  const done=T.items.map((it,n)=>[it,n]).filter(([i])=>i.done).sort((a,b)=>(b[0].done_at||"").localeCompare(a[0].done_at||"")||b[1]-a[1]).map(([i])=>i).slice(0,200);
   const groups=[["Overdue",todos.filter(i=>i.due&&i.due<day),"late"],["Today",todos.filter(i=>i.due===day)],["Coming up",todos.filter(i=>i.due&&i.due>day).sort((a,b)=>a.due.localeCompare(b.due))],["Anytime",todos.filter(i=>!i.due)]];
   const needs=S.projects.filter(p=>p.needs_you||p.phase==="awaiting_approval");
   const sugN=T.suggestions.reduce((a,s)=>a+s.items.filter(i=>i.state==="new").length,0);
@@ -946,7 +949,7 @@ function viewToday(){
   const needsP=needs.length?`<div class="panel tpanel qcard urgent"><h3>Waiting on you</h3>${needs.map(p=>`<div class="needrow" data-proj="${esc(p.path)}"><span>${esc(p.name)}</span><span class="muted" style="font-size:12.5px">${p.phase==="awaiting_approval"?"plan needs approval":p.needs_you+" decision"+(p.needs_you===1?"":"s")} ›</span></div>`).join("")}</div>`:"";
   const todoP=`<div class="panel tpanel"><h3>To-dos</h3>
     ${groups.filter(g=>g[1].length).map(([n,l,c])=>`<div class="tgroup ${c||""}">${n}</div>${l.map(itemRow).join("")}`).join("")||`<div class="muted" style="font-size:13px;margin-top:6px">Nothing to do. Add one below, or accept suggestions from your inbox.</div>`}
-    ${doneToday.length?`<div class="tgroup">Done today</div>${doneToday.map(itemRow).join("")}`:""}
+    ${done.length?`<div class="tgroup">Done · ${done.length}${done.length>3?" · scroll for more":""}</div><div class="tdone">${done.map(itemRow).join("")}</div>`:""}
     <div class="tadd"><input class="inp" id="t-new" data-draft="t-new" placeholder="Add a to-do" value="${esc(S.drafts["t-new"]||"")}">
       ${projSelect('id="t-proj" data-draft="t-proj"',S.drafts["t-proj"]||"")}<input class="inp" type="date" id="t-due" data-draft="t-due" value="${esc(S.drafts["t-due"]||"")}" aria-label="Due date">
       <button class="btn sm primary" data-tact="add">Add</button></div></div>`;
@@ -1016,6 +1019,9 @@ function limitsPanel(){
     ${sel("lim-calls","Model calls per executor run","A run is stopped after this many steps.",mi.executor_max_turns||0,[0,10,20,30,50,80,120],v=>v?v+" calls":"No cap")}
     ${sup.mode==="dashboard"?sel("lim-sup","Supervisor turns without you","It pauses after this many turns in a row.",sup.max_auto_turns||40,[10,20,40,80,160],v=>v+" turns"):""}</div>`;
 }
+// the done list shows its three newest rows; the rest scroll
+function capDone(){ document.querySelectorAll(".tdone").forEach(b=>{ b.style.maxHeight=""; if(b.children.length>3) b.style.maxHeight=[...b.children].slice(0,3).reduce((h,x)=>h+x.offsetHeight,0)+"px"; }); }
+window.addEventListener("resize", capDone);
 function updateJump(){ const c=$("chatlog"), j=$("jumpChat"); if(!c||!j) return; j.classList.toggle("on", c.scrollTop+c.clientHeight < c.scrollHeight-120); }
 function growBox(t){ t.style.height="auto"; t.style.height=Math.min(180,t.scrollHeight)+"px"; }
 document.addEventListener("scroll", e=>{ if(e.target.id==="chatlog") updateJump(); }, true);
