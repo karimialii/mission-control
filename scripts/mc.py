@@ -482,7 +482,10 @@ def perm_remove(m: Mission, pattern: str, by: str) -> bool:
 # Sandboxed full access: every shell command runs without asking, but inside Claude Code's OS sandbox,
 # which can only write to the working folder and reach the internet domains listed here.
 DEFAULT_DOMAINS = ["pypi.org", "files.pythonhosted.org", "registry.npmjs.org", "github.com", "*.githubusercontent.com"]
-SANDBOX_DENY_READ = ["~/.ssh", "~/.aws", "~/.gnupg", "~/.config/gh", "~/.netrc", "~/.docker", "~/.kube", str(MC_HOME)]
+SANDBOX_DENY_READ = ["~/.ssh", "~/.aws", "~/.gnupg", "~/.config/gh", "~/.netrc", "~/.docker", "~/.kube",
+                     # only the private parts of Mission Control's own folder: `mc` must stay runnable
+                     str(MC_HOME / "today"), str(MC_HOME / "notify.json"), str(MC_HOME / "notify.log"), str(MC_HOME / ".sandbox-probe")]
+SANDBOX_TMP = ["/tmp", "/private/tmp"]  # test servers often put Unix sockets here (macOS caps socket paths at 104 bytes)
 SANDBOX_TOOLS = "Read,Edit,Write,Glob,Grep,NotebookEdit,TodoWrite,Bash"
 
 
@@ -509,11 +512,15 @@ def net_domains(m: Mission) -> list:
 
 
 def sandbox_settings(m: Mission) -> str:
+    probe = MC_HOME / ".sandbox-probe"
+    if not probe.exists():
+        MC_HOME.mkdir(parents=True, exist_ok=True)
+        probe.write_text("Mission Control hides this file from sandboxed agents, so `mc` can tell where it runs.\n")
     return json.dumps({"sandbox": {
         "enabled": True, "autoAllowBashIfSandboxed": True, "allowUnsandboxedCommands": False, "failIfUnavailable": True,
         "excludedCommands": ["mc", "mc *"],  # Mission Control's own CLI launches executors, so it runs outside
-        "network": {"allowedDomains": sorted(set(net_domains(m)))},
-        "filesystem": {"denyRead": SANDBOX_DENY_READ},
+        "network": {"allowedDomains": sorted(set(net_domains(m))), "allowUnixSockets": SANDBOX_TMP},
+        "filesystem": {"denyRead": SANDBOX_DENY_READ, "allowWrite": SANDBOX_TMP},
     }})
 
 
@@ -829,7 +836,38 @@ def launch_human(m: Mission, tid: str) -> int:
     return 0
 
 
+def defer_launch(m: Mission, tid: str, force: bool) -> int:
+    """Inside the agent sandbox an executor couldn't reach its model, so the dashboard starts it instead."""
+    with open(m.dir / "launch-requests.jsonl", "a") as f:
+        f.write(json.dumps({"task": tid, "force": force, "ts": now()}) + "\n")
+    m.update_task(tid, lambda x: x.update(step="starting…"))
+    return 0
+
+
+def drain_launch_requests(m: Mission) -> list:
+    """Dashboard loop: start the runs a sandboxed supervisor asked for."""
+    p = m.dir / "launch-requests.jsonl"
+    if not p.exists():
+        return []
+    with m.lock():
+        rows = [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
+        p.unlink()
+    started, seen = [], set()
+    for r in rows:
+        if r.get("task") in seen:
+            continue
+        seen.add(r.get("task"))
+        try:
+            launch(m, r["task"], force=bool(r.get("force")))
+            started.append(r["task"])
+        except (RuntimeError, SystemExit) as e:
+            m.event("error", "system", f"couldn't start {r.get('task')}: {short(str(e), 160)}", task=r.get("task"))
+    return started
+
+
 def launch(m: Mission, tid: str, force: bool = False) -> int:
+    if compat.in_agent_sandbox():
+        return defer_launch(m, tid, force)
     """Start one task attempt as a detached background process. Returns pid.
     force=True is only for a person pressing Run: it skips the attempt limit and pending permission checks."""
     if os.environ.get("MC_ROLE") == "supervisor":
@@ -2302,7 +2340,8 @@ def cmd_run(a):
         try:
             pid = launch(m, tid, force=os.environ.get("MC_ROLE") != "supervisor")
             t = m.task(tid)
-            print(f"{tid} handed to @{t.get('assignee')} ({t.get('step')})" if is_human(t) else f"{tid} started (pid {pid})")
+            print(f"{tid} handed to @{t.get('assignee')} ({t.get('step')})" if is_human(t)
+                  else f"{tid} queued: the dashboard starts it within a few seconds" if not pid else f"{tid} started (pid {pid})")
         except RuntimeError as e:
             print(f"{tid}: {e}")
 

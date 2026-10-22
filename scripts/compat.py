@@ -300,3 +300,16 @@ def augment_path() -> list:
     if added:
         os.environ["PATH"] = os.pathsep.join(cur + added)
     return added
+
+
+def in_agent_sandbox() -> bool:
+    """True inside the OS sandbox Mission Control gives its agents. The sandbox hides one marker file
+    ($MC_HOME/.sandbox-probe) from them, so failing to read it means we're inside."""
+    probe = Path(os.environ.get("MC_HOME", str(Path.home() / ".mission-control"))) / ".sandbox-probe"
+    try:
+        probe.read_bytes()
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False

@@ -16,6 +16,8 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+import compat
+
 MC_HOME = Path(os.environ.get("MC_HOME", str(Path.home() / ".mission-control")))
 CONFIG = MC_HOME / "notify.json"
 LOG = MC_HOME / "notify.log"
@@ -159,6 +161,10 @@ def on_event(m, ev: dict) -> None:
     try:
         if os.environ.get("MC_NOTIFY") == "0":
             return
+        if compat.in_agent_sandbox():  # settings are hidden in here: the dashboard sends it instead
+            with open(m.dir / "notify-queue.jsonl", "a") as f:
+                f.write(json.dumps(ev, ensure_ascii=False) + "\n")
+            return
         cfg = load()
         if not cfg["enabled"]:
             return
@@ -172,6 +178,23 @@ def on_event(m, ev: dict) -> None:
         send(cfg, title, body, kind, {"project": m.meta().get("name") or m.root.name, "task": ev.get("task")})
     except Exception as e:  # a notification must never break a mission
         log(f"on_event: {e}")
+
+
+def drain_queue(m) -> int:
+    """Dashboard loop: send what sandboxed processes queued in .mission/notify-queue.jsonl."""
+    p = m.dir / "notify-queue.jsonl"
+    if not p.exists():
+        return 0
+    try:
+        tmp = p.with_suffix(".sending")
+        os.replace(p, tmp)
+        rows = [json.loads(l) for l in tmp.read_text().splitlines() if l.strip()]
+        tmp.unlink()
+    except (OSError, ValueError):
+        return 0
+    for ev in rows:
+        on_event(m, ev)
+    return len(rows)
 
 
 # ---- delivery

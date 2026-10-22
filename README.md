@@ -261,9 +261,10 @@ Everything Mission Control writes about a project is in the hidden folder `<proj
 By default the supervisor and executors (Claude) have **full access inside the project**: they run any command without stopping to ask. The operating system keeps them in bounds using Claude Code's built-in sandbox:
 
 - **Writes** go only to the folder the agent works in (the project, or the task's own worktree in git mode) and a private temp folder. Everything else on your computer is read-only to them.
-- **Your keys are hidden:** `~/.ssh`, `~/.aws`, `~/.gnupg`, GitHub CLI logins, `~/.netrc`, Docker and Kubernetes configs, and `~/.mission-control`.
+- **Your keys are hidden:** `~/.ssh`, `~/.aws`, `~/.gnupg`, GitHub CLI logins, `~/.netrc`, Docker and Kubernetes configs, and your private Mission Control data (Today page, notification settings).
 - **Internet** is limited to a list of sites, by default package registries and GitHub (`pypi.org`, `files.pythonhosted.org`, `registry.npmjs.org`, `github.com`, `*.githubusercontent.com`). Edit it per project in **Settings → What agents can do**. When an agent needs another site, the supervisor asks you (a `Domain(example.com)` request with **Allow** / **Don't allow**).
-- There is no "run it outside the sandbox" escape hatch. Only Mission Control's own `mc` command runs outside it, so the supervisor can launch executors.
+- `/tmp` is writable and Unix sockets under `/tmp` are allowed, for test servers that need short socket paths.
+- There is no "run it outside the sandbox" escape hatch. Only Mission Control's own `mc` command runs outside it, so the supervisor can launch executors. When it runs `mc` inside the sandbox (in a pipeline, say), runs and notifications are handed to the dashboard, which carries them out.
 
 The sandbox works on macOS out of the box and on Linux/WSL2 with `bubblewrap` and `socat` installed. Where it isn't available, Mission Control falls back to **only allowed commands**, the older mode where each kind of command is allowed one by one (you can also choose that mode in Settings). Codex uses its own `workspace-write` sandbox; Gemini needs an approval mode you choose.
 

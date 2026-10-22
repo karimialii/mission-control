@@ -246,6 +246,8 @@ def supervisor_loop() -> None:
             try:
                 m = mc.Mission(path)
                 mc.reap_dead(m)
+                mc.drain_launch_requests(m)
+                mc.notify.drain_queue(m)
                 mc.watches_tick(m)
                 mc.ensure_attempt_limit_cards(m)
                 if (time.time() - LAST_SYNC.get(path, 0) > SYNC_EVERY
