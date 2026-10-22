@@ -460,6 +460,22 @@ code{font-family:var(--mono);font-size:.92em}
 .conf.low{background:color-mix(in srgb,var(--pink) 16%,transparent);color:var(--pink)}
 .ibtn{border:0;background:var(--panel);color:var(--text);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;flex:none}
 .ibtn.ok{color:var(--green)} .ibtn:hover{background:var(--fill)}
+.mrow{display:flex;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.mrow:first-child{border-top:0}
+.mrow .mt{flex:none;width:46px;font-size:12.5px;line-height:1.35}
+.mrow .mt span{color:var(--mute);font-size:11.5px}
+.mrow .mb{flex:1;min-width:0}
+.mrow .mtitle{font-size:13.5px;font-weight:500;overflow-wrap:anywhere}
+.mrow.past{opacity:.45}
+.mrow.live .mtitle{color:var(--green)}
+.mrow.free .mtitle{font-weight:400;color:var(--mute)}
+.nowline{display:flex;align-items:center;gap:8px;color:var(--red);font:600 11px var(--ui);margin:2px 0}
+.nowline::after{content:"";flex:1;height:1.5px;background:var(--red)}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:12px}
+.wday{border:0;background:var(--fill2);border-radius:10px;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;color:var(--text)}
+.wday small{font-size:10.5px;color:var(--mute)} .wday b{font:600 14px var(--display)} .wday i{font-style:normal;font-size:10px;color:var(--mute)}
+.wday.on{background:var(--blue);color:#fff} .wday.on small,.wday.on i{color:rgba(255,255,255,.8)}
+.ibtn:disabled{opacity:.35;cursor:default}
 .tdone{overflow-y:auto;overscroll-behavior:contain}
 .tdone .trow:first-child{border-top:0}
 .tnotes{width:100%;min-height:120px;resize:vertical}
@@ -573,7 +589,7 @@ function changed(key, data){ const h=JSON.stringify(data); if(S.hashes[key]===h)
 function render(){
   renderNav(); renderHeader();
   const v = S.view, cp = S.projects.find(p=>p.path===S.cur), splash = cp && !cp.initialized && !GLOBAL.has(v);
-  const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="today" ? [S.today, S.projects.map(p=>[p.name,p.needs_you,p.phase,p.counts])] : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
+  const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="today" ? [S.today, S.calDay, S.projects.map(p=>[p.name,p.needs_you,p.phase,p.counts])] : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
   if(changed("main", [splash?"ignite":v, S.cur, data, v==="settings"?[S.notify,S.snaps,S.snapOpen,S.snapChanges,S.st?.access,S.st?.mission,S.st?.supervisor]:0])){
     const act = document.activeElement, aid = act && act.id, sel = act && act.selectionStart;
     const cl=$("chatlog"), stick=!cl || S.chatBottom || cl.scrollTop+cl.clientHeight>=cl.scrollHeight-60, clTop=cl?.scrollTop||0, sideTop=document.querySelector(".side")?.scrollTop||0, doneTop=document.querySelector(".tdone")?.scrollTop||0, qsTop=$("qscroll")?.scrollTop||0;
@@ -936,6 +952,30 @@ function itemRow(it){
     <button class="x2" data-tact="del" data-id="${esc(it.id)}" aria-label="Delete">×</button></div>`;
 }
 function short(t,n){ t=String(t||""); return t.length>n?t.slice(0,n-1)+"…":t; }
+function calPanel(T){
+  const C=T.calendar||{days:{},sources:[]}, off=S.calDay||0;
+  const base=new Date(T.now.slice(0,10)+"T00:00"), plus=i=>new Date(base.getFullYear(),base.getMonth(),base.getDate()+i), day=plus(off), key=day.toLocaleDateString("sv-SE");
+  const label=off===0?"Today":off===1?"Tomorrow":day.toLocaleDateString(undefined,{weekday:"long"});
+  const list=C.days[key]||[], allday=list.filter(o=>o.all_day), timed=list.filter(o=>!o.all_day);
+  if(!C.sources.length) return `<div class="panel tpanel"><h3>Calendar</h3><p class="muted" style="font-size:12.5px;margin:4px 0 0">Add your calendar to see today's meetings and get a ping before each one. In Calendar or Outlook, export it as an <b>.ics</b> file, then drop it into your inbox folder or add its path in <b>Settings</b> below. It's read on this computer only.</p></div>`;
+  let nowDrawn=off!==0;
+  const rows=timed.map(o=>{ const past=off===0&&o.end<=T.now, live=off===0&&o.start<=T.now&&T.now<o.end;
+    let line=""; if(!nowDrawn&&off===0&&o.start>T.now){ line=`<div class="nowline"><span>now ${T.now.slice(11)}</span></div>`; nowDrawn=true; }
+    if(live) nowDrawn=true;
+    return line+`<div class="mrow ${past?"past":""} ${live?"live":""} ${o.free?"free":""}"><div class="mt mono">${o.start.slice(11)}<br><span>${o.end.slice(0,10)===o.start.slice(0,10)?o.end.slice(11):"→ "+dfmt(o.end.slice(0,10))}</span></div>
+      <div class="mb"><div class="mtitle">${esc(o.title)}${live?' <span class="tag" style="color:var(--green)">now</span>':""}</div>
+      <div class="meta">${o.location&&!/^https?:/.test(o.location)?`<span class="tag">📍 ${esc(short(o.location,48))}</span>`:""}${o.attendees>1?`<span class="tag">${o.attendees} people</span>`:""}${o.free?'<span class="tag">free</span>':""}</div></div>
+      ${o.join&&!past?`<a class="btn sm ${live||(off===0&&o.start>T.now&&minsUntil(T.now,o.start)<=15)?"primary":""}" href="${esc(o.join)}" target="_blank" rel="noopener noreferrer">Join</a>`:""}</div>`; }).join("");
+  const week=[...Array(7)].map((_,i)=>{ const d=plus(i), k=d.toLocaleDateString("sv-SE"), n=(C.days[k]||[]).filter(o=>!o.all_day).length;
+    return `<button class="wday ${i===off?"on":""}" data-calday="${i}"><small>${i===0?"Today":d.toLocaleDateString(undefined,{weekday:"short"})}</small><b>${d.getDate()}</b><i>${n?n+(n===1?" mtg":" mtgs"):"·"}</i></button>`; }).join("");
+  return `<div class="panel tpanel"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3>Calendar · ${label}</h3>
+      <span style="display:flex;gap:4px"><button class="ibtn" data-calday="${Math.max(0,off-1)}" ${off===0?"disabled":""} aria-label="Previous day">‹</button><button class="ibtn" data-calday="${Math.min(14,off+1)}" ${off>=14?"disabled":""} aria-label="Next day">›</button></span></div>
+    <div class="muted" style="font-size:12.5px">${day.toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})}${timed.length?` · ${timed.length} meeting${timed.length===1?"":"s"}`:""}</div>
+    ${allday.length?`<div class="meta" style="margin-top:8px">${allday.map(o=>`<span class="tag" style="color:var(--text)">${esc(o.title)}</span>`).join("")}</div>`:""}
+    <div style="margin-top:6px">${rows||`<div class="muted" style="font-size:13px;padding:10px 0">No meetings${off===0?" today":""}.</div>`}${!nowDrawn&&timed.length?`<div class="nowline"><span>now ${T.now.slice(11)}</span></div>`:""}</div>
+    <div class="week">${week}</div></div>`;
+}
+function minsUntil(now,t){ return (new Date(t)-new Date(now))/60000; }
 function viewToday(){
   const T=S.today; if(!T) return head("Today","Loading…");
   const now=T.now, day=now.slice(0,10), hr=+now.slice(11,13);
@@ -945,7 +985,8 @@ function viewToday(){
   const groups=[["Overdue",todos.filter(i=>i.due&&i.due<day),"late"],["Today",todos.filter(i=>i.due===day)],["Coming up",todos.filter(i=>i.due&&i.due>day).sort((a,b)=>a.due.localeCompare(b.due))],["Anytime",todos.filter(i=>!i.due)]];
   const needs=S.projects.filter(p=>p.needs_you||p.phase==="awaiting_approval");
   const sugN=T.suggestions.reduce((a,s)=>a+s.items.filter(i=>i.state==="new").length,0);
-  const sub=`${new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})} · ${todos.length} to-do${todos.length===1?"":"s"}${rem.length?` · ${rem.length} reminder${rem.length===1?"":"s"}`:""}${sugN?` · ${sugN} suggested from your inbox`:""}`;
+  const mtgs=((T.calendar?.days||{})[day]||[]).filter(o=>!o.all_day&&o.end>now).length;
+  const sub=`${new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})}${mtgs?` · ${mtgs} meeting${mtgs===1?"":"s"} left`:""} · ${todos.length} to-do${todos.length===1?"":"s"}${rem.length?` · ${rem.length} reminder${rem.length===1?"":"s"}`:""}${sugN?` · ${sugN} suggested from your inbox`:""}`;
   const needsP=needs.length?`<div class="panel tpanel qcard urgent"><h3>Waiting on you</h3>${needs.map(p=>`<div class="needrow" data-proj="${esc(p.path)}"><span>${esc(p.name)}</span><span class="muted" style="font-size:12.5px">${p.phase==="awaiting_approval"?"plan needs approval":p.needs_you+" decision"+(p.needs_you===1?"":"s")} ›</span></div>`).join("")}</div>`:"";
   const todoP=`<div class="panel tpanel"><h3>To-dos</h3>
     ${groups.filter(g=>g[1].length).map(([n,l,c])=>`<div class="tgroup ${c||""}">${n}</div>${l.map(itemRow).join("")}`).join("")||`<div class="muted" style="font-size:13px;margin-top:6px">Nothing to do. Add one below, or accept suggestions from your inbox.</div>`}
@@ -983,11 +1024,17 @@ function viewToday(){
     <div class="lrow"><div><div style="font-size:13px">Who reads the emails</div><div class="muted" style="font-size:12px">The email text is sent to this model. A local command keeps it on this computer.</div></div>
       <select class="sel" data-treader>${[["claude:haiku","Claude Haiku (cheapest)"],["claude:sonnet","Claude Sonnet"],["command","Local command"],["simulator","Simulator (free demo)"]].map(([v,l])=>`<option value="${v}" ${v===rv?"selected":""}>${l}</option>`).join("")}</select></div>
     ${rd.type==="command"?`<div class="tadd"><input class="inp mono" id="t-cmd" data-draft="t-cmd" placeholder='["ollama","run","qwen2.5","--format","json"]' value="${esc(S.drafts["t-cmd"]??JSON.stringify(rd.cmd||[]))}"><button class="btn sm" data-tact="cmd">Save</button></div>`:""}
+    <div class="label" style="margin-top:14px">Calendars</div>
+    <p class="muted" style="font-size:12px;margin:4px 0 0">Exported .ics files, read on this computer only. To refresh, export again: a new export dropped in the inbox folder replaces the old one with the same name.</p>
+    ${(T.calendar?.sources||[]).map(c=>`<div class="lrow"><div style="min-width:0"><div class="mono" style="font-size:12px;overflow-wrap:anywhere">${esc(c.path)}</div><div class="muted" style="font-size:11.5px">${c.ok?`${c.events} events · updated ${dfmt(c.updated)}`:`<span style="color:var(--red)">${esc(c.error)}</span>`}</div></div><button class="x2" data-tact="${c.dropped?"rmdropped":"rmcal"}" data-id="${esc(c.path)}" aria-label="Remove calendar">×</button></div>`).join("")}
+    <div class="tadd" style="margin-top:6px"><input class="inp mono" id="t-cal" data-draft="t-cal" placeholder="~/Downloads/Calendar.ics" value="${esc(S.drafts["t-cal"]||"")}"><button class="btn sm" data-tact="addcal">Add</button></div>
+    <div class="lrow"><div><div style="font-size:13px">Ping me before meetings</div><div class="muted" style="font-size:12px">Through your notification channels.</div></div>
+      <select class="sel" data-tmeet>${[[0,"Off"],[5,"5 min before"],[10,"10 min before"],[15,"15 min before"],[30,"30 min before"]].map(([v,l])=>`<option value="${v}" ${+cfg.meeting_reminder===v?"selected":""}>${l}</option>`).join("")}</select></div>
     <div class="label" style="margin-top:14px">How to recognise each project</div>
     <p class="muted" style="font-size:12px;margin:4px 0 0">Client names, colleagues, codenames. The reader matches emails against these and each project's goal.</p>
     ${T.projects.map(p=>`<div class="lrow"><span style="font-size:13px;flex:none;max-width:40%">${esc(p.name)}</span><input class="inp" data-tprof="${esc(p.path)}" placeholder="e.g. Acme, Sara, Stripe" value="${esc((cfg.profiles[p.path]||{}).aliases||"")}"></div>`).join("")||`<div class="muted" style="font-size:12.5px">Add a project first.</div>`}
     ${cfg.rules.length?`<div class="label" style="margin-top:14px">Learned rules</div>${cfg.rules.map((r,i)=>`<div class="lrow"><span style="font-size:13px">${esc(r.from)} → ${esc(r.name)}</span><button class="x2" data-tact="rmrule" data-i="${i}" aria-label="Remove rule">×</button></div>`).join("")}`:""}</details>`;
-  return head(hello, sub) + `<div class="today"><div>${needsP}${todoP}${remP}</div><div>${inboxP}${notesP}${setP}</div></div>`;
+  return head(hello, sub) + `<div class="today"><div>${needsP}${calPanel(T)}${todoP}${remP}</div><div>${inboxP}${notesP}${setP}</div></div>`;
 }
 async function todayPost(action, body){ S.today=await post("/api/today/"+action, body); delete S.hashes.main; render(); }
 async function todayAct(el){
@@ -1007,6 +1054,10 @@ async function todayAct(el){
   if(a==="cmd"){ let c; try{ c=JSON.parse(S.drafts["t-cmd"]||"[]"); }catch(e){ return toast('Write it as a JSON list, e.g. ["ollama","run","qwen2.5"]',true); }
     await todayPost("config",{config:{reader:{cmd:c}}}); toast("Saved"); return; }
   if(a==="rmrule") return todayPost("config",{config:{remove_rule:i}});
+  if(a==="addcal"){ const v=(S.drafts["t-cal"]||"").trim(); if(!v) return toast("Paste the path of an .ics file",true);
+    await todayPost("config",{config:{add_calendar:v}}); S.drafts["t-cal"]=""; toast("Calendar added"); return; }
+  if(a==="rmcal") return todayPost("config",{config:{remove_calendar:id}});
+  if(a==="rmdropped") return todayPost("config",{config:{remove_dropped:id}});
 }
 function limitsPanel(){
   const mi=S.st.mission, sup=S.st.supervisor||{};
@@ -1237,7 +1288,7 @@ async function refreshLog(){
 
 /* ───────── events ───────── */
 document.addEventListener("click", async e=>{
-  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
+  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-calday],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
   if(!el) return;
   try{
     if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(S.view==="comms") S.chatBottom=true; if(!GLOBAL.has(S.view)){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
@@ -1262,6 +1313,7 @@ document.addEventListener("click", async e=>{
       await post("/api/remove-project",{p:p.path}); if(S.cur===p.path){ S.cur=null; S.view="overview"; lsSet("mc.view","overview"); } S.hashes={}; toast(`Removed "${p.name}". Its files are untouched`); await tick(); return; }
     if(el.id==="sendChat"){ return sendChat(); }
     if(el.dataset.tact){ await todayAct(el); return; }
+    if(el.dataset.calday!==undefined){ S.calDay=+el.dataset.calday; delete S.hashes.main; render(); return; }
     if(el.id==="jumpChat"){ const c=$("chatlog"); c.scrollTo({top:c.scrollHeight,behavior:"smooth"}); return; }
     if(el.dataset.rmdom!==undefined||el.id==="addDom"||el.id==="resetDom"){ const a=S.st.access; let d=[...(a.domains||[])];
       if(el.id==="resetDom") d=[...a.default_domains]; else if(el.id==="addDom"){ const v=(S.drafts.domIn||"").trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\/.*$/,""); if(!v) return toast("Type a site, e.g. example.com",true); d.push(v); S.drafts.domIn=""; }
@@ -1348,6 +1400,7 @@ document.addEventListener("change", async e=>{ const t=e.target;
   if(t.dataset?.snapon!==undefined){ await post("/api/snapshot",{action:"toggle",on:t.checked}).catch(()=>{}); return tick(); }
   if(t.dataset?.tdone) return todayPost("item",{id:t.dataset.tdone,patch:{done:t.checked}}).catch(()=>{});
   if(t.dataset?.tmove!==undefined){ await todayPost("suggestion",{id:t.dataset.tmove,action:"move",project:t.value||null}).catch(()=>{}); return toast(t.value?"Moved. Emails from this sender will go there from now on":"Moved"); }
+  if(t.dataset?.tmeet!==undefined) return todayPost("config",{config:{meeting_reminder:+t.value}}).then(()=>toast(+t.value?`You'll be pinged ${t.value} min before meetings`:"Meeting pings off")).catch(()=>{});
   if(t.dataset?.tauto!==undefined) return todayPost("config",{config:{auto:t.checked}}).catch(()=>{});
   if(t.dataset?.treader!==undefined){ const [ty,md]=t.value.split(":"); return todayPost("config",{config:{reader:{type:ty,...(md?{model:md}:{})}}}).catch(()=>{}); }
   if(t.dataset?.tprof) return todayPost("config",{config:{profile:{project:t.dataset.tprof,aliases:t.value}}}).then(()=>toast("Saved")).catch(()=>{});

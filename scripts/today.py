@@ -17,10 +17,11 @@ import shutil
 import subprocess
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import compat
+import ics
 import notify
 
 MC_HOME = Path(os.environ.get("MC_HOME", str(Path.home() / ".mission-control")))
@@ -36,6 +37,8 @@ DEFAULT_CONFIG = {
     "reader": {"type": "claude", "model": "haiku", "cmd": []},
     "profiles": {},              # project path -> {"aliases": "client names, people, keywords"}
     "rules": [],                 # [{"from": "sara@x.com", "project": path}] learned from corrections
+    "calendars": [],             # .ics files to read (exports from Outlook, Apple Calendar, Google)
+    "meeting_reminder": 15,      # minutes before a meeting to ping; 0 = off
 }
 
 
@@ -127,6 +130,21 @@ def set_config(patch: dict) -> dict:
             path, aliases = patch["profile"].get("project"), str(patch["profile"].get("aliases", ""))[:500]
             if path in projects():
                 cfg["profiles"][path] = {"aliases": aliases}
+        if patch.get("add_calendar"):
+            p = Path(str(patch["add_calendar"]).strip().strip("'\"")).expanduser().resolve()
+            if not p.is_file() or p.suffix.lower() != ".ics":
+                raise ValueError(f"not an .ics file: {p}")
+            ics.load(p)  # fails here, not later, if it can't be read
+            shown = str(p).replace(str(Path.home()), "~", 1)
+            if shown not in cfg["calendars"]:
+                cfg["calendars"].append(shown)
+        if isinstance(patch.get("remove_calendar"), str):
+            cfg["calendars"] = [c for c in cfg["calendars"] if c != patch["remove_calendar"]]
+        if isinstance(patch.get("remove_dropped"), str):
+            name = Path(patch["remove_dropped"]).name  # only a file name, never a path
+            (DIR / "calendars" / name).unlink(missing_ok=True)
+        if "meeting_reminder" in patch:
+            cfg["meeting_reminder"] = max(0, min(120, int(patch["meeting_reminder"] or 0)))
         if isinstance(patch.get("remove_rule"), int) and 0 <= patch["remove_rule"] < len(cfg["rules"]):
             cfg["rules"].pop(patch["remove_rule"])
         _write("config.json", cfg)
@@ -241,6 +259,83 @@ def notes(text: str | None = None) -> str:
         return p.read_text()
     except OSError:
         return ""
+
+
+# ───────────────────────── calendar ─────────────────────────
+# Read locally from .ics exports: a file you point to, or one you drop in the inbox folder
+# (kept in $MC_HOME/today/calendars/, the newest export with a name replaces the older one).
+
+def calendar_files(cfg: dict | None = None) -> list:
+    cfg = cfg or config()
+    files = [Path(c).expanduser() for c in cfg.get("calendars", [])]
+    d = DIR / "calendars"
+    if d.is_dir():
+        files += sorted(d.glob("*.ics"))
+    return files
+
+
+def meetings(days_before: int = 0, days_after: int = 14) -> dict:
+    """{"days": {date: [occurrence]}, "sources": [...]} for the window around today."""
+    events, sources = [], []
+    for f in calendar_files():
+        try:
+            evs = ics.load(f)
+            events += evs
+            sources.append({"path": str(f).replace(str(Path.home()), "~", 1), "ok": True, "events": len(evs),
+                            "updated": datetime.fromtimestamp(f.stat().st_mtime).strftime("%Y-%m-%dT%H:%M"),
+                            "dropped": f.parent == DIR / "calendars"})
+        except (OSError, ValueError) as e:
+            sources.append({"path": str(f), "ok": False, "error": str(e)[:200], "dropped": f.parent == DIR / "calendars"})
+    today = datetime.now().date()
+    seen, days = set(), {}
+    for o in ics.occurrences(events, today - timedelta(days=days_before), today + timedelta(days=days_after + 1)):
+        k = (o["uid"], o["start"])
+        if k in seen:  # the same calendar exported twice
+            continue
+        seen.add(k)
+        if o["all_day"]:  # an all-day event spanning days shows on each of them
+            d = datetime.fromisoformat(o["start"]).date()
+            while d.isoformat() < o["end"][:10]:
+                days.setdefault(d.isoformat(), []).append(o)
+                d += timedelta(days=1)
+        else:
+            days.setdefault(o["start"][:10], []).append(o)
+    return {"days": days, "sources": sources}
+
+
+_LAST_CAL = [0.0]
+
+
+def meeting_reminders_tick() -> int:
+    """Ping once, N minutes before each timed meeting today. Checked every 30 seconds."""
+    if time.time() - _LAST_CAL[0] < 30:
+        return 0
+    _LAST_CAL[0] = time.time()
+    cfg = config()
+    lead = int(cfg.get("meeting_reminder") or 0)
+    if not lead or not calendar_files(cfg):
+        return 0
+    now = datetime.now()
+    soon = (now + timedelta(minutes=lead)).strftime("%Y-%m-%dT%H:%M")
+    nows = now.strftime("%Y-%m-%dT%H:%M")
+    todays = meetings(0, 1)["days"]
+    due = [o for d in todays.values() for o in d if not o["all_day"] and not o["free"] and nows <= o["start"] <= soon]
+    if not due:
+        return 0
+    with lock():
+        fired = _read("meetings_fired.json", {})
+        new = [o for o in due if f"{o['uid']}|{o['start']}" not in fired]
+        for o in new:
+            fired[f"{o['uid']}|{o['start']}"] = o["start"][:10]
+        cutoff = (now - timedelta(days=2)).strftime("%Y-%m-%d")
+        _write("meetings_fired.json", {k: v for k, v in fired.items() if v >= cutoff})
+    ncfg = notify.load()
+    if new and ncfg["enabled"] and ncfg["kinds"].get("reminder", True):
+        for o in new:
+            mins = max(0, round((datetime.fromisoformat(o["start"]) - now).total_seconds() / 60))
+            where = o["location"] if o["location"] and not o["location"].startswith("http") else ("Online" if o["join"] else "")
+            notify.send(ncfg, f"In {mins} min: {o['title']}"[:80], f"{o['start'][11:]}–{o['end'][11:]}" + (f" · {where}" if where else ""), "reminder")
+    return len(new)
 
 
 # ───────────────────────── inbox reader ─────────────────────────
@@ -381,6 +476,16 @@ def _process(force: bool) -> dict:
     seen = _read("seen.json", {})
     failed = _read("failed.json", {})
     done_files, new, errors, cost = 0, 0, [], 0.0
+    for f in sorted(d.glob("*.ics")):  # a calendar export: keep it as a calendar, don't read it with a model
+        if f.is_file() and not f.is_symlink():
+            try:
+                ics.parse(f.read_text(errors="replace"))
+                (DIR / "calendars").mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(f, DIR / "calendars" / f.name)
+                _archive(f)
+                done_files += 1
+            except (OSError, ValueError) as e:
+                errors.append(f"{f.name}: {e}")
     names = projects()
     keys = {f"P{i + 1}": path for i, path in enumerate(names)}
     for f in inbox_files(cfg):
@@ -500,12 +605,13 @@ def state() -> dict:
         "projects": [{"path": p, **info} for p, info in names.items()],
         "items": items(),
         "suggestions": [s for s in suggestions() if not s.get("closed")],
-        "pending_files": [f.name for f in inbox_files(cfg)],
+        "pending_files": [f.name for f in inbox_files(cfg)] + ([f.name for f in sorted(d.glob("*.ics"))] if d else []),
         "errors": [{"file": v.get("file"), "error": v.get("error")} for v in failed.values()][-5:],
         "notes": notes(),
         "busy": _PROCESSING.locked(),
         "cost_today": round(cost_today, 4),
         "now": now_local(),
+        "calendar": meetings(0, 14),
     }
 
 
@@ -513,10 +619,12 @@ _LAST_AUTO = [0.0]
 
 
 def tick() -> None:
-    """Dashboard loop hook: due reminders every call, the inbox every AUTO_EVERY seconds (in the background)."""
+    """Dashboard loop hook: due reminders every call, meetings every 30 s, the inbox every AUTO_EVERY seconds."""
     reminders_tick()
+    meeting_reminders_tick()
     cfg = config()
     if cfg.get("auto") and cfg.get("inbox") and time.time() - _LAST_AUTO[0] > AUTO_EVERY and not _PROCESSING.locked():
         _LAST_AUTO[0] = time.time()
-        if inbox_files(cfg):
+        d = inbox_dir(cfg)
+        if inbox_files(cfg) or (d and any(d.glob("*.ics"))):
             threading.Thread(target=process_inbox, daemon=True).start()
