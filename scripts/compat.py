@@ -278,3 +278,38 @@ MAX_CMDLINE = 30000  # CreateProcess caps a whole command line at 32,767 charact
 
 def cmdline_too_long(cmd: list) -> bool:
     return IS_WIN and sum(len(str(a)) + 3 for a in cmd) > MAX_CMDLINE
+
+
+def augment_path() -> list:
+    """Add the folders where AI CLIs usually live to PATH (apps started from a GUI or a fresh shell often miss them).
+    Returns the folders that were added."""
+    home = Path.home()
+    cands = [home / ".local" / "bin", home / ".claude" / "local", home / ".npm-global" / "bin", home / ".bun" / "bin",
+             home / ".cargo" / "bin", home / ".volta" / "bin"]
+    if IS_WIN:
+        cands += [Path(os.environ.get("APPDATA", home / "AppData" / "Roaming")) / "npm",
+                  Path(os.environ.get("LOCALAPPDATA", home / "AppData" / "Local")) / "Programs" / "claude",
+                  home / "AppData" / "Local" / "Microsoft" / "WinGet" / "Links"]
+    else:
+        cands += [Path("/opt/homebrew/bin"), Path("/usr/local/bin"), Path("/home/linuxbrew/.linuxbrew/bin")]
+        nvm = home / ".nvm" / "versions" / "node"
+        if nvm.is_dir():
+            cands += sorted(nvm.glob("*/bin"))
+    cur = os.environ.get("PATH", "").split(os.pathsep)
+    added = [str(c) for c in cands if c.is_dir() and str(c) not in cur]
+    if added:
+        os.environ["PATH"] = os.pathsep.join(cur + added)
+    return added
+
+
+def in_agent_sandbox() -> bool:
+    """True inside the OS sandbox Mission Control gives its agents. The sandbox hides one marker file
+    ($MC_HOME/.sandbox-probe) from them, so failing to read it means we're inside."""
+    probe = Path(os.environ.get("MC_HOME", str(Path.home() / ".mission-control"))) / ".sandbox-probe"
+    try:
+        probe.read_bytes()
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False

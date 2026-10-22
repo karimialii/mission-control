@@ -28,16 +28,24 @@
 | ⚡ **Autopilot** | Tasks launch automatically as soon as their dependencies finish, up to your parallel limit. |
 | ✅ **Objective checks** | Give a task a `check` (tests, build, lint). If it passes, the task auto-approves without a supervisor turn. |
 | 💸 **Cost control** | Exact per-run tokens and cost, a per-run budget cap, and a model-call cap. The supervisor can pick a *cheaper* model on its own, but a pricier one needs your OK. |
-| 🔐 **Permission requests** | Agents run headless with an allow-list. A denied command becomes an **Allow / Don't allow** card that only you can answer. |
+| 🔐 **Sandboxed full access** | Agents run any command without asking, confined by the OS to the project folder and a list of sites. Snapshots before every run let you restore any file. |
 | 🌿 **Git and teams** | Each task works in its own worktree and branch, merged into `mission/<name>` on approval. You can hand tasks to teammates as GitHub issues and PRs, and finish with one PR (with a preview first). |
+| ☀️ **Today page** | Start your day with to-dos, reminders and notes, plus to-dos suggested from emails you copy into a folder (no mail access needed). |
+| 🔔 **Notifications** | Get pinged on your desktop, phone (ntfy), Slack/Discord or any webhook when a decision is waiting, something fails or a mission finishes. |
 | ⏳ **Watches** | Wait for long external jobs (simulations, downloads) without polling and without spending tokens. |
 | 🔁 **Disposable chats** | `STATE.md` checkpoints let you drop a long supervisor chat and say "resume mission" in a fresh one. |
 | 🧪 **Simulator** | A fake executor that uses no tokens, so you can try the whole flow for free. |
 
 ## Contents
-[Quick start](#quick-start) · [Tour](#tour) · [Install](#install-once) · [Platforms and agents](#supported-platforms-and-agents) · [Use it in a project](#use-it-in-any-project) · [Models](#choose-your-models-expensive-supervisor-cheap-executors) · [Dashboard](#dashboard-one-for-all-projects) · [Watches](#waiting-for-long-jobs-watches) · [Safety limits](#safety-limits-nothing-loops-nothing-runs-away) · [Permissions](#permissions) · [Security model](#security-model-read-before-use) · [Teams and git](#teams-git-github-and-teammates) · [Runners](#runners-adding-any-ai) · [Token model](#token-model) · [Files](#files) · [License](#license)
+[Quick start](#quick-start) · [Tour](#tour) · [Install](#install-once) · [Platforms and agents](#supported-platforms-and-agents) · [Use it in a project](#use-it-in-any-project) · [Models](#choose-your-models-expensive-supervisor-cheap-executors) · [Dashboard](#dashboard-one-for-all-projects) · [Watches](#waiting-for-long-jobs-watches) · [Today](#today-your-start-of-day-page) · [Notifications](#notifications) · [Safety limits](#safety-limits-nothing-loops-nothing-runs-away) · [Permissions](#permissions-sandboxed-full-access) · [Snapshots](#snapshots-undo-anything-an-agent-did) · [Security model](#security-model-read-before-use) · [Teams and git](#teams-git-github-and-teammates) · [Runners](#runners-adding-any-ai) · [Token model](#token-model) · [Files](#files) · [License](#license)
 
 ## Quick start
+**Fastest:** download the repo and run one command. It checks Python, git and which AI CLIs (Claude, Codex, Gemini) you have, picks a sensible default, and opens the dashboard.
+```bash
+python3 start.py          # Windows: double-click start.bat, or: python start.py
+```
+Nothing else to configure. If Claude isn't installed but Codex or Gemini is, new projects use that one. The steps below are the manual route.
+
 **1. Install** (macOS, Linux or Windows, Python 3.9+):
 ```bash
 git clone https://github.com/karimialii/mission-control.git
@@ -91,6 +99,57 @@ Or open the dashboard, choose **All Projects → Add a project**, paste a folder
 
 *Screenshots show the built-in simulator on demo projects.*
 
+## Work packages, milestones and phases
+Real projects are planned in rounds: you plan, build, look at the result, and plan again. Mission Control structures a mission like a research project:
+
+```
+Mission
+ └─ Work package   a large area of work ("Software brain", "Hardware"); several can run in parallel
+     └─ Milestone   one plan → build → review cycle, with a goal and "done when" criteria
+         └─ Phase   automatic: tasks that can run together (dependency order)
+             └─ Task   what one executor does
+```
+
+- **Each milestone ends with a review gate.** When its tasks are finished, the supervisor runs the full checks, writes an **outcome** (what was built, what didn't work, what it learned, open questions) and proposes the next milestone. You approve that plan in the dashboard, with the previous outcome shown above it, before anything in it runs.
+- **One open milestone per work package**, so each area moves step by step while different areas can progress side by side.
+- **Timeline and Board** show a milestone bar: click a milestone to see its tasks, goal, criteria and outcome. With a single milestone the bar stays hidden, so small missions look as before.
+- Existing missions become `WP1` / `M1.1` automatically.
+- Commands: `mc wp new --title … --goal …`, `mc milestone new --wp WP1 --title … --goal … --done-when …`, `mc milestone close M1.1 --outcome …`, `mc wp close WP1 --summary …`, `mc milestones`.
+
+## Today: your start-of-day page
+The dashboard opens on **Today**: your to-dos, reminders, notes, the projects waiting on you, and suggestions from your inbox.
+
+**Inbox without giving access to your mail.** Mission Control never connects to Outlook, Teams or any mail server. You copy emails and meeting notes into Markdown files in one folder (one email per file, or several separated by a `---` line) and set that folder under **Today → Settings**. Including the `From:`, `Date:` and `Subject:` lines makes sorting much more accurate.
+
+Every minute (or when you press **Process now**), each new email is read by a cheap model that has **no tools** and must answer in a fixed format. It picks the project the email is about, writes a one-line reason and suggests to-dos and reminders. Nothing is added until you accept it. Files that were read move to `processed/` inside the folder.
+
+- **Sorting by project** uses each project's name and goal, plus the "also known by" names you add in Settings (clients, colleagues, codenames). Unsure matches say so. When you move an email to another project, the sender is remembered and their next emails go there without asking the model.
+- **Reminders** ping your notification channels once at their time (see [Notifications](#notifications)).
+- **Calendar.** Export your calendar as an `.ics` file (Apple Calendar: File → Export; Outlook: Save Calendar) and either add its path under **Today → Settings → Calendars**, or drop the file into your inbox folder (a newer export with the same name replaces the old one). Today shows the day's meetings with a "now" line, a week strip to look ahead, an **Open calendar** button for the full **Calendar** page (Day, Week, Month and List views; keys D/W/M/L, ← → and T for today; click a meeting for its details), and **Join** buttons for Teams, Zoom, Meet and Webex links. You get a ping 15 minutes before each meeting (adjustable, or off). The file is read on your computer with no model involved: time zones, recurring meetings, and moved or cancelled instances are handled.
+- **Who reads the emails:** Claude Haiku by default (about $0.001 per email), Sonnet, a **local command** that keeps the text on your computer (for example `["ollama","run","qwen2.5","--format","json"]`), or a free simulator for trying it out. **Check your organisation's rules before sending work email to a cloud model.**
+- Emails are treated as untrusted: the reader can't act, and instructions inside an email are ignored.
+- State is in `~/.mission-control/today/`, readable only by you.
+
+## Notifications
+Long runs shouldn't wait on you. Mission Control can ping you when:
+- **a decision is waiting** (a question, permission or model request for you),
+- **something failed** (a runner error or a failed check),
+- **every task is done** (once per completion; adding tasks re-arms it),
+- **a watched external job** finished or failed.
+
+Channels: **desktop** (macOS and Linux with `notify-send`), **ntfy** (push to your phone), **Slack/Discord** webhook, and a generic **JSON webhook**. Set them up in **Settings → Notifications**, or from the CLI:
+```bash
+mc notify set desktop                       # on (use --off to switch a channel off)
+mc notify set ntfy my-private-topic         # then install the ntfy app and subscribe to that topic
+mc notify set slack https://hooks.slack.com/services/...
+mc notify mute watch                        # stop one kind (unmute to bring it back)
+mc notify test                              # sends a test to every channel that is on
+```
+Settings are global (`~/.mission-control/notify.json`, readable only by you) and apply to every project. Notes:
+- Messages include short task summaries. Only use channels you trust, and treat webhook URLs and ntfy topics as secrets (the dashboard never shows them in full).
+- The supervisor can't change these settings. Set `MC_NOTIFY=0` to silence everything for one run (for example in CI).
+- A channel that fails never affects a mission; errors go to `~/.mission-control/notify.log`.
+
 ## Install (once)
 ```bash
 bash install.sh          # macOS, Linux, WSL
@@ -107,7 +166,7 @@ This links the folder to `~/.claude/skills/mission-control` (a symlink, or a dir
 | Agent | As supervisor | As executor |
 |---|---|---|
 | Claude Code | Tested. `install.sh` installs it as a skill | Tested (`claude` runner) |
-| Codex CLI | Untested template (`codex-supervisor`) | Untested template (`codex` runner) |
+| Codex CLI | Works (`codex-supervisor`) | Works (`codex` runner) |
 | Gemini CLI | Untested template; add an approval mode you trust | Untested template; without an approval flag, headless tool calls may stall |
 | Any other agent with a shell | Point it at `AGENTS.md` / `SKILL.md` and run `python3 <path-to-this-folder>/scripts/mc.py` | Hand it `mc.py brief T-00x`; it reports with `mc.py report` |
 
@@ -199,7 +258,7 @@ The dashboard checks it every N seconds **without using any tokens**, and wakes 
 - At most 10 active watches per mission. Without the dashboard running, an external supervisor's `mc wait` checks them too.
 
 ## Safety limits (nothing loops, nothing runs away)
-Set in **Chat → Safety limits**, or `mc.py limits`:
+Set in **Settings → Safety limits**, or `mc.py limits`:
 
 | Limit | Default | What happens at the limit |
 |---|---|---|
@@ -215,21 +274,32 @@ Set in **Chat → Safety limits**, or `mc.py limits`:
 ## Where the files are
 Everything Mission Control writes about a project is in the hidden folder `<project>/.mission/`: `reports/T-001.md` (each executor's report), `feedback/`, `runs/` (full session transcripts), `usage.jsonl` (every turn and run), `chat.jsonl`, `STATE.md`. Finder hides folders that start with a dot: use **Open folder** in the toolbar, or **Show in Finder** in a task's report, or press ⇧⌘. in Finder. What the executors actually produce (code, data, documents) is written into the project itself (in git mode, into the task's worktree until it is merged).
 
-## Permissions
-Executors and the supervisor can, by default, edit files and run tests, builds, `python3 -m …`, `npm run …` and read-only git commands. Anything else is denied, and the denial is shown in the task's report with suggested rules.
+## Permissions: sandboxed full access
+By default the supervisor and executors (Claude) have **full access inside the project**: they run any command without stopping to ask. The operating system keeps them in bounds using Claude Code's built-in sandbox:
 
-- **The supervisor asks you first.** It sends a request (for example `Bash(~/venvs/env/bin/python *)` or `WebSearch`). You see it in **Chat → Decisions waiting on you** with **Allow** / **Don't allow**. Only you can approve it: the supervisor can't grant or answer a permission request itself.
-- **Manage the list yourself** in **Chat → Permissions** (add a rule, or press × to remove one), or `mc.py allow '<rule>'` / `mc.py allow --remove '<rule>'`.
-- Rules are per project, apply to both executors and the supervisor, and use Claude Code's rule syntax: `Tool` or `Tool(pattern)`.
-- They are passed on each run's command line. A project's own `.claude/settings.json` has no effect on these headless runs in a folder Claude hasn't been told to trust.
+- **Writes** go only to the folder the agent works in (the project, or the task's own worktree in git mode) and a private temp folder. Everything else on your computer is read-only to them.
+- **Your keys are hidden:** `~/.ssh`, `~/.aws`, `~/.gnupg`, GitHub CLI logins, `~/.netrc`, Docker and Kubernetes configs, and your private Mission Control data (Today page, notification settings).
+- **Internet** is limited to a list of sites, by default package registries and GitHub (`pypi.org`, `files.pythonhosted.org`, `registry.npmjs.org`, `github.com`, `*.githubusercontent.com`). Edit it per project in **Settings → What agents can do**. When an agent needs another site, the supervisor asks you (a `Domain(example.com)` request with **Allow** / **Don't allow**).
+- `/tmp` is writable and Unix sockets under `/tmp` are allowed, for test servers that need short socket paths.
+- There is no "run it outside the sandbox" escape hatch. Only Mission Control's own `mc` command runs outside it, so the supervisor can launch executors. When it runs `mc` inside the sandbox (in a pipeline, say), runs and notifications are handed to the dashboard, which carries them out.
+
+The sandbox works on macOS out of the box and on Linux/WSL2 with `bubblewrap` and `socat` installed. Where it isn't available, Mission Control falls back to **only allowed commands**, the older mode where each kind of command is allowed one by one (you can also choose that mode in Settings). Codex uses its own `workspace-write` sandbox; Gemini needs an approval mode you choose.
+
+## Snapshots: undo anything an agent did
+Because agents can change anything in the project, Mission Control keeps restorable copies of the folder:
+
+- **When:** before every agent run (executor attempts and supervisor turns), every 30 minutes while agents are working, and whenever you press **Take a snapshot now**. If nothing changed since the last one, nothing is saved.
+- **How long:** 7 days, then they're deleted automatically.
+- **Where:** a private store in `.mission/snapshots.git`, separate from your project's own git, so it works in any folder and never touches your history. Each file is stored once, however many snapshots contain it.
+- **What's skipped:** files over 50 MB, cloud files that are online-only (OneDrive/iCloud placeholders, so nothing gets downloaded), anything your `.gitignore` excludes, and folders like `node_modules`, `.venv`, `build`.
+- **Restoring:** in **Settings → Snapshots**, open a snapshot to see which files differ from now, then restore one file or all of them. Files created after the snapshot are kept. The current state is snapshotted first, so a restore can itself be undone.
 
 ## Security model (read before use)
-The allow-list limits what agents do **by accident**. It is **not a sandbox**. Run missions only on code and briefs you trust, as your own user, ideally in a container or VM for untrusted repos.
+The sandbox confines shell commands, but it is not a full virtual machine. Run missions only on code and briefs you trust, ideally in a container or VM for untrusted repos.
 
-- **Executors can run code.** An executor may `Write` a file and then run it through allowed commands such as `python3 -m …`, `pytest` or `npm run …`. In practice this means arbitrary code runs as your user.
-- **Reads aren't confined to the project.** `Read` and `cat *` can read any file your user can, for example `~/.ssh` or `.env` files.
+- **Executors run code.** In sandboxed mode any command runs, confined as described above. In allow-list mode, a written file can still be run through allowed commands such as `python3 -m …`.
+- **Reads aren't confined to the project.** Shell commands can't read the hidden key folders, but Claude's own `Read` tool follows permission rules instead of the sandbox and can read other files your user can.
 - **`check` commands run in a shell** (`shell=True`) with your user's rights. Whoever writes the plan decides what runs.
-- **The Codex and Gemini templates don't use this allow-list.** `codex exec --full-auto` uses Codex's own sandbox policy, and Gemini needs an approval mode you choose.
 - **The dashboard is local only.** It binds to `127.0.0.1` and rejects other `Host` headers (which blocks DNS rebinding). Every state-changing request needs a per-run random token. Read-only endpoints serve only projects you registered. Any process running as your user on this machine can still reach it.
 - **What stays on your machine:** `.mission/` (transcripts, reports, costs) and `~/.mission-control/` (project registry, runner overrides). Nothing is sent anywhere except through the AI CLIs you configure and, in git mode, `git push` / `gh` to your own remote.
 
@@ -305,6 +375,7 @@ Runner templates live in `runners.default.json`. To override or add one, create 
   runs/T-001/         prompts, raw streams and transcripts per attempt
   STATE.md            compact resume file
 ```
+Global, in `~/.mission-control/`: `projects.json` (the project list), `notify.json` (notification settings, private), `today/` (to-dos, reminders, inbox suggestions; private), `notify.log` (delivery errors).
 
 ## License
 MIT. See `LICENSE`.

@@ -24,8 +24,14 @@ All state lives in `<project>/.mission/`. The user watches everything live in th
 - Existing mission (or "resume mission"): `MC status`, then `MC inbox`.
 - Tell the user they can watch at the dashboard: `MC dashboard --open` (one dashboard serves all projects at http://127.0.0.1:7777).
 
-## 2 · Plan
-Explore just enough of the codebase to cut the work well. Then write the whole plan in one call:
+## Structure: work packages → milestones → phases → tasks
+- **Work package** (`WP1`, `WP2`…): a large area of work with its own goal ("Software brain", "Hardware"). They may progress in parallel. Create one only for a genuinely separate area: `MC wp new --title "..." --goal "..."`. Close it when its goal is met: `MC wp close WP2 --summary "..."`.
+- **Milestone** (`M1.1`, `M1.2`…): one plan → build → **review** cycle inside a work package, with a goal and "done when" criteria. A work package has at most one open milestone. **This is where re-planning happens:** never re-plan a whole mission in place; finish the milestone, review it, and plan the next one from what you learned.
+- **Phases** are automatic: the dependency order of tasks inside a milestone. Don't plan them by hand.
+- **Tasks** are what executors do, as before.
+- Every mission starts with `WP1` / `M1.1`. Small missions never need more; the dashboard hides the structure until there is a second milestone or work package. `MC milestones` shows the tree with each milestone's outcome.
+
+Explore just enough of the codebase to cut the work well. Then write the whole plan in one call: (the tasks go into the milestone being planned; to start the next milestone in the same call, add `"milestone": {"wp": "WP1", "title": "...", "goal": "...", "done_when": ["..."]}` to the JSON)
 
 ```bash
 MC plan - <<'EOF'
@@ -75,13 +81,26 @@ After 3 failed attempts on the same task, stop retrying. Split it, rewrite the b
 - If the decision blocks everything, also ask it in chat and wait. Otherwise keep working on other tasks.
 - Status updates in chat are short: what finished, what's running, and what you need. The dashboard has the details.
 
+## 5½ · Milestone review gate
+When every task in a milestone is finished, the milestone moves to **review** and your inbox shows `MILESTONE M1.x ... is finished`. Then:
+1. **Verify the whole milestone**: run the full test suite or build, check its "done when" criteria, and fix small gaps (or add a final task to it).
+2. **Write the outcome**: `MC milestone close M1.x --outcome "<what was built · what didn't work · what you learned · open questions>"`. Keep it to a few lines: the next plan starts from it, and the user reads it.
+3. **Propose what comes next** in chat, in plain words, then write the next milestone's plan (`MC plan -` with a `"milestone"` object). In the dashboard it waits for the user's approval, together with the previous outcome. If the work package's goal is met, close it instead (`MC wp close`).
+Don't start the next milestone's work before its plan is approved (`MC approve` is the user's, not yours).
+
 ## 6 · Finish
 When every task is done, verify the whole: run the full test suite or build, and check that the pieces integrate. Then fix the gaps with a final task or yourself. Run `MC checkpoint` and give the user a short summary: what was built, the decisions made, and the total executor cost (from `MC status`).
 
 ## Permissions (the user decides)
-- Executors and the dashboard supervisor run headless with a narrow allow-list (edit files, tests, builds, `python3 -m`, `npm run`, git status/diff). The project can add more; they are passed on the command line, because a project's own `.claude/settings.json` is ignored by headless sessions in folders that haven't been trusted. **Never edit that file to grant access.**
-- When a report shows **PERMISSION DENIED**, the inbox lists suggested rules. Ask the user with `MC request-permission T-00x '<rule>' ... --why "<what it is for>"`: keep rules as narrow as possible (a specific interpreter path, `WebSearch`, `WebFetch`). It shows up in the dashboard with **Allow** / **Don't allow** buttons. You cannot grant or answer it yourself (`MC allow` is refused for you). End your turn; you're woken when they answer. If they allowed it, run `MC review T-00x changes "permission granted, retry"`.
-- The user can also manage rules directly in **Chat → Permissions**, or with `MC allow '<rule>'` / `MC allow --remove '<rule>'`.
+- **Default: sandboxed full access.** You and the executors can run any command in the project without asking. The operating system keeps shell commands inside the working folder, hides the user's keys, and only reaches the internet sites listed for the project (package registries and GitHub by default). `mc` itself runs outside the sandbox. Don't ask for `Bash(...)` rules in this mode: they aren't needed.
+- **Run `mc` commands on their own line** (no `|`, `&&`, `;`, `>` or `cd … &&`). A plain `mc …` runs outside the sandbox; a combined one runs inside it, where `mc pr`, `mc sync` and anything that pushes or calls GitHub can't work. Everything else still works inside: runs you start are handed to the dashboard, which launches them within seconds.
+- **Never ask the user to loosen the sandbox or to unhide `~/.mission-control`.** If an `mc` command fails with "Operation not permitted", run it again on its own line.
+- **Test servers:** `/tmp` is writable and Unix sockets under `/tmp` work, so tests that need short socket paths run normally.
+- **A blocked site** shows up in a report as a network error naming the host (`deny network-outbound example.com:443`). If the task really needs it, ask the user: `MC request-permission T-00x 'Domain(example.com)' --why "<what it is for>"`. Writing outside the project is never allowed: change the plan instead.
+- **Snapshots** of the project are taken before every run and every 30 minutes while agents work, kept 7 days. The user restores files in **Settings → Snapshots**. Don't rely on them as your plan: still keep tasks small and reviewable.
+- **Allow-list mode** (older; the user may choose it in Settings, or the system has no sandbox): agents can only run allowed commands. When a report shows **PERMISSION DENIED**, the inbox lists suggested rules. Ask with `MC request-permission T-00x '<rule>' ... --why "..."`, as narrow as possible (a specific interpreter path, `WebSearch`).
+- Requests show up in the dashboard with **Allow** / **Don't allow** buttons. You cannot grant or answer them yourself (`MC allow` is refused for you). End your turn; you're woken when they answer. If they allowed it, run `MC review T-00x changes "permission granted, retry"`.
+- Rules are passed on the command line, because a project's own `.claude/settings.json` is ignored by headless sessions in folders that haven't been trusted. **Never edit that file to grant access.** The user manages access in **Settings**.
 
 ## Waiting for external jobs
 Never start polling scripts, `sleep` loops or background watchers: they keep your turn open and block the user's messages. When something outside Mission Control has to finish (a simulation, a download), register a watch and end your turn: `MC watch add "<name>" --file <path that appears> --fail-contains <log> Traceback --fail-if-gone "<text in the process's command line>" --task T-00x --note "<what you'll do next>"`. Mission Control checks it for free and wakes you when it's done, failed or timed out (a WATCH item in your inbox). Conditions are read-only file/process checks inside the project. `MC watch list` / `MC watch cancel W-001` manage them.
@@ -109,5 +128,11 @@ Tasks have an attempt limit (3 by default). When it's reached the user is asked 
 - That executor reports back with `MC report T-00x --status done --summary "..." --files a b`, or returns its REPORT block, which you record with the same command.
 - Everything else (review, questions, dashboard) works the same.
 
+## Notifications
+The user can be pinged (desktop, phone via ntfy, Slack/Discord, webhook) when a decision is waiting, something fails, every task is done, or a watch fires. This happens automatically on every event, so **don't tell the user to keep the dashboard open, and don't ping them yourself**. Settings are global and the user's to change (`MC notify` is refused for you). If they ask to be notified, point them to **Settings → Notifications** or `MC notify set <desktop|ntfy|slack|webhook> [value]`, then `MC notify test`. Questions you send them (`MC ask`, `MC request-permission`, `MC request-model`) are what trigger a "decision" ping, so keep their text short and self-explanatory: it is the notification body.
+
+## Today page
+The dashboard's **Today** page holds the user's personal to-dos, reminders and inbox suggestions (`~/.mission-control/today/`). It is theirs: don't read or edit it unless they ask.
+
 ## Command cheat-sheet
-`init · plan · add · set · assign · sync-base · watch · request-model · request-permission · allow · models · goal · approve · status · diff · sync · pr · git · done · checkpoint · brief · run · stop · cancel · wait · inbox · review · answer · ask · decide · note · autopilot · projects · dashboard`. Run `MC <cmd> -h` for flags.
+`init · plan · wp · milestone · add · set · assign · sync-base · watch · request-model · request-permission · allow · notify · models · goal · approve · status · diff · sync · pr · git · done · checkpoint · brief · run · stop · cancel · wait · inbox · review · answer · ask · decide · note · autopilot · projects · dashboard`. Run `MC <cmd> -h` for flags.

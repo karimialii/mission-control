@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 import webbrowser
+from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -22,6 +23,7 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import compat  # noqa: E402
 import mc  # noqa: E402
+import today  # noqa: E402
 
 if __name__ == "__main__":
     compat.ensure_utf8()
@@ -180,6 +182,7 @@ def summary(path: str, info: dict) -> dict:
 
 
 def full_state(m: mc.Mission) -> dict:
+    mc.ensure_structure(m)
     tasks = m.tasks()
     levels = mc.phase_levels(tasks)
     for t in tasks:
@@ -193,7 +196,17 @@ def full_state(m: mc.Mission) -> dict:
     return {"mission": m.meta(), "supervisor": sup, "resume_cmd": resume, "watches": mc.watch_list(m) if mc.watches_dir(m).exists() else [], "chat": mc.chat_log(m)[-200:], "path": str(m.root), "tasks": tasks, "questions": [dict(q, perm_info=mc.perm_infos(q["permission"])) if q.get("permission") else q for q in m.questions()],
             "plan_permissions": mc.plan_permission_rules(m) if meta.get("phase") == "awaiting_approval" else [],
             "notes": m.notes()[-50:], "events": m.events()[-300:], "runners": runners,
-            "ready": [t["id"] for t in mc.ready_tasks(m, tasks)], "server_time": mc.now()}
+            "ready": [t["id"] for t in mc.ready_tasks(m, tasks)], "server_time": mc.now(),
+            "access": {"mode": mc.access_mode(m), "chosen": meta.get("access") or "sandbox", "supported": mc.sandbox_supported(),
+                       "domains": mc.net_domains(m), "default_domains": mc.DEFAULT_DOMAINS}}
+
+
+def snapshot_state(m: mc.Mission) -> dict:
+    err = m.dir / "snapshots.git" / "mc-error"
+    return {"on": mc.snapshots_on(m), "available": mc.snapshots.available(), "busy": mc.snapshots.busy(m.root),
+            "list": [{k: s[k] for k in ("ref", "ts", "reason")} for s in mc.snapshots.list_snapshots(m.root)[:200]],
+            "size": mc.snapshots.size_bytes(m.root), "error": err.read_text() if err.exists() else "",
+            "keep_days": mc.snapshots.KEEP_DAYS, "every_min": mc.snapshots.EVERY // 60}
 
 
 def read_log(m: mc.Mission, tid: str, attempt: int, offset: int) -> dict:
@@ -222,6 +235,10 @@ SYNC_EVERY = 90  # seconds between GitHub checks for human tasks
 def supervisor_loop() -> None:
     """Reaps finished runners, marks crashed ones, syncs human tasks from GitHub, and runs autopilot."""
     while True:
+        try:
+            today.tick()
+        except Exception as e:  # the Today page must never stop the mission loop
+            print(f"[loop] today: {e}", file=sys.stderr)
         with CHILD_LOCK:
             mc.SPAWNED[:] = [p for p in mc.SPAWNED if p.poll() is None]
         for path in project_paths():
@@ -230,6 +247,9 @@ def supervisor_loop() -> None:
             try:
                 m = mc.Mission(path)
                 mc.reap_dead(m)
+                mc.drain_launch_requests(m)
+                mc.milestones_tick(m)
+                mc.notify.drain_queue(m)
                 mc.watches_tick(m)
                 mc.ensure_attempt_limit_cards(m)
                 if (time.time() - LAST_SYNC.get(path, 0) > SYNC_EVERY
@@ -248,9 +268,38 @@ def supervisor_loop() -> None:
                             mc.wake_supervisor(m)
                 if m.meta().get("autopilot"):
                     mc.schedule(m)
+                if mc.snapshots_on(m) and ((sup.get("pid") and mc.pid_alive(sup["pid"])) or any(t["status"] == "running" and not mc.is_human(t) for t in m.tasks())):
+                    mc.snapshots.maybe(m.root, "every 30 minutes while agents work")
             except Exception as e:  # keep the loop alive no matter what
                 print(f"[loop] {path}: {e}", file=sys.stderr)
         time.sleep(2)
+
+
+def today_post(action: str, body: dict) -> dict:
+    """The Today page's writes. ValueError becomes a 400 with its message."""
+    if action == "config":
+        today.set_config(body.get("config") or {})
+    elif action == "add":
+        today.add_item(body.get("text", ""), body.get("project"), body.get("due"), body.get("remind_at"))
+    elif action == "item":
+        today.update_item(str(body.get("id")), body.get("patch") or {})
+    elif action == "suggestion":
+        idx = body.get("item")
+        today.resolve(str(body.get("id")), str(body.get("action")), int(idx) if idx is not None else None,
+                      body.get("edits"), body.get("project"))
+    elif action == "notes":
+        today.notes(str(body.get("text", "")))
+    elif action == "process":
+        threading.Thread(target=today.process_inbox, kwargs={"force": True}, daemon=True).start()
+    elif action == "reveal":
+        d = today.inbox_dir()
+        if not d:
+            raise ValueError("set an inbox folder first")
+        if not compat.reveal(d):
+            raise ValueError(f"can't open folders on this system: {d}")
+    else:
+        raise ValueError("unknown action")
+    return {"ok": True, **today.state()}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -304,10 +353,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, usage_csv(m), "text/csv")
             if u.path == "/api/config":
                 return self._send(200, {"clone_dir": str(default_clone_dir()).replace(str(Path.home()), "~", 1)})
+            if u.path == "/api/notify":
+                return self._send(200, mc.notify.masked())
+            if u.path == "/api/calendar":
+                a, b = (date.fromisoformat(q[k]) for k in ("from", "to"))
+                if not 0 <= (b - a).days <= 62:
+                    return self._send(400, {"error": "ask for at most two months"})
+                return self._send(200, {**today.meetings_range(a, b), "now": today.now_local()})
+            if u.path == "/api/today":
+                return self._send(200, today.state())
             if u.path == "/api/projects":
                 return self._send(200, [summary(p, i) for p, i in project_paths().items()])
             if u.path == "/api/state":
                 return self._send(200, full_state(get_mission(q["p"])))
+            if u.path == "/api/snapshots":
+                return self._send(200, snapshot_state(get_mission(q["p"])))
+            if u.path == "/api/snapshot-changes":
+                return self._send(200, {"changes": mc.snapshots.changes(get_mission(q["p"]).root, q["ref"])[:500]})
             if u.path == "/api/log":
                 return self._send(200, read_log(get_mission(q["p"]), q["t"], int(q.get("a", 1)), int(q.get("o", 0))))
             if u.path == "/api/brief":
@@ -360,6 +422,18 @@ class Handler(BaseHTTPRequestHandler):
                 mc.write_json(mc.MC_HOME / "projects.json", keep)  # only the list changes; no project files are touched
                 LAST_SYNC.pop(str(body.get("p")), None)
                 return self._send(200, {"ok": True, "removed": len(before) - len(keep)})
+            if u.path == "/api/notify":
+                try:
+                    mc.notify.update({k: body[k] for k in ("enabled", "kinds", "channels") if k in body})
+                except ValueError as e:
+                    return self._send(400, {"error": str(e)})
+                return self._send(200, mc.notify.masked())
+            if u.path.startswith("/api/today/"):
+                return self._send(200, today_post(u.path.rsplit("/", 1)[1], body))
+            if u.path == "/api/notify-test":
+                cfg = mc.notify.load()
+                res = mc.notify.send(cfg, "Mission Control test", "If you can read this, notifications work.", "test", wait=True)
+                return self._send(200, {"results": res or {"none": "no channel is switched on"}})
             m = get_mission(body["p"])
             tid = body.get("t")
             if tid is not None and not TASK_ID.fullmatch(str(tid)):
@@ -471,6 +545,31 @@ class Handler(BaseHTTPRequestHandler):
                 mc.sup_update(m, **kw)
                 if body.get("reset"):
                     mc.chat_add(m, "system", "Supervisor session reset. The next turn starts fresh from the mission state.")
+            elif u.path == "/api/access":
+                meta = m.meta()
+                if body.get("mode") in ("sandbox", "allowlist"):
+                    meta["access"] = body["mode"]
+                    m.event("permission", "user", "agents now have " + ("sandboxed full access to the project" if body["mode"] == "sandbox" else "only the allowed commands"))
+                if isinstance(body.get("domains"), list):
+                    doms = [str(d).strip().lower() for d in body["domains"] if re.fullmatch(r"(\*\.)?[a-z0-9.-]+(:\d+)?", str(d).strip().lower())]
+                    meta["net_domains"] = sorted(set(doms))
+                m.save_meta(meta)
+            elif u.path == "/api/snapshot":
+                act = body.get("action")
+                if act == "toggle":
+                    meta = m.meta()
+                    meta["snapshots"] = bool(body.get("on"))
+                    m.save_meta(meta)
+                elif act == "take":
+                    snap = mc.snapshots.take(m.root, "taken by you")
+                    return self._send(200, {"ok": True, "taken": bool(snap)})
+                elif act == "restore":
+                    paths = body.get("paths") if isinstance(body.get("paths"), list) else None
+                    res = mc.snapshots.restore(m.root, str(body.get("ref")), paths)
+                    m.event("note", "user", f"restored {res['restored']} file(s) from the snapshot of {res['from'].replace('T', ' ')}")
+                    return self._send(200, {"ok": True, **res})
+                else:
+                    return self._send(400, {"error": "unknown snapshot action"})
             elif u.path == "/api/autopilot":
                 meta = m.meta()
                 meta["autopilot"] = bool(body.get("on"))

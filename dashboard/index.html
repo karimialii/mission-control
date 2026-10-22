@@ -397,6 +397,188 @@ code{font-family:var(--mono);font-size:.92em}
 @keyframes bStageOut{to{transform:scale(1.08);filter:blur(8px)}}
 .app.reveal{animation:bApp .9s var(--e) both}
 @keyframes bApp{from{opacity:.0;transform:scale(.985)}to{opacity:1;transform:none}}
+/* ── chat ── */
+.comms{grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr)}
+.comms.solo{grid-template-columns:minmax(0,1fr);max-width:920px;margin:0 auto}
+.chat{height:calc(100dvh - 200px);position:relative}
+.chat-log{scroll-behavior:auto;overscroll-behavior:contain;padding:18px 20px 24px}
+.msg{max-width:82%}
+.msg.sup{max-width:88%}
+.msg.cont{margin-top:3px}
+.msg.me.cont{border-top-right-radius:8px}.msg.sup.cont{border-top-left-radius:8px}
+.dayline{display:flex;align-items:center;gap:10px;margin:14px 0 4px;color:var(--mute);font-size:11.5px}
+.dayline::before,.dayline::after{content:"";flex:1;height:1px;background:var(--line)}
+.chat-empty{margin:auto;text-align:center;max-width:380px;display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+.chat-empty .big{font-size:34px}
+.jump{position:absolute;right:18px;bottom:86px;border:0;border-radius:980px;padding:7px 13px;background:var(--blue);color:#fff;font:600 12.5px var(--ui);box-shadow:var(--shadow);cursor:pointer;opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .15s,transform .15s}
+.jump.on{opacity:1;transform:none;pointer-events:auto}
+.composer textarea{resize:none;overflow-y:auto}
+.composer-hint{font-size:11px;color:var(--dim);padding:0 18px 8px;text-align:right}
+.side{max-height:calc(100dvh - 200px);overflow:auto;padding-right:2px}
+@media(max-width:960px){.comms{grid-template-columns:minmax(0,1fr)}.side{max-height:none}}
+/* ── settings ── */
+.settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+@media(max-width:1000px){.settings{grid-template-columns:minmax(0,1fr)}}
+.mode{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:12px;margin-top:8px;cursor:pointer;background:var(--fill2)}
+.mode.on{box-shadow:0 0 0 1.5px var(--blue)}
+.mode input{margin-top:3px;accent-color:var(--blue)}
+.snap{border-top:1px solid var(--line)}
+.tgroup + .snap{border-top:0}
+.snaprow{display:flex;gap:10px;align-items:center;padding:8px 2px;cursor:pointer}
+.snaprow .tx{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.snapbody{padding:4px 2px 12px}
+.chrow{display:flex;gap:8px;align-items:center;padding:3px 0}
+.chrow .tx{flex:1;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st{font:700 10.5px var(--mono);width:18px;text-align:center;border-radius:4px;padding:1px 0}
+.st-M{color:var(--orange);background:color-mix(in srgb,var(--orange) 14%,transparent)}
+.st-D{color:var(--red);background:color-mix(in srgb,var(--red) 14%,transparent)}
+.st-A{color:var(--green);background:color-mix(in srgb,var(--green) 14%,transparent)}
+/* ── milestones ── */
+.msbar{background:var(--panel);border-radius:var(--r);box-shadow:var(--shadow);padding:12px 16px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px}
+.msrow{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.mswp{font-size:12.5px;color:var(--mute);min-width:150px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mswp b{color:var(--text)}
+.mspills{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.mspill{display:inline-flex;align-items:center;gap:7px;border:0;background:var(--fill2);color:var(--text);border-radius:980px;padding:5px 12px 5px 9px;font:500 12.5px var(--ui);cursor:pointer;max-width:320px}
+.mspill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mspill em{font-style:normal;color:var(--mute);font-size:11.5px}
+.mspill i{font-style:normal;font-size:11px;width:14px;text-align:center}
+.mspill.on{box-shadow:0 0 0 1.5px var(--blue);background:color-mix(in srgb,var(--blue) 10%,var(--panel))}
+.mspill.s-done i{color:var(--green)} .mspill.s-executing i{color:var(--blue)} .mspill.s-review i{color:var(--purple)} .mspill.s-awaiting_approval i,.mspill.s-planning i{color:var(--orange)}
+.mscard{background:var(--panel);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 18px;margin-bottom:14px;border-left:4px solid var(--blue)}
+.mscard.s-done{border-left-color:var(--green)} .mscard.s-review{border-left-color:var(--purple)} .mscard.s-awaiting_approval,.mscard.s-planning{border-left-color:var(--orange)}
+.msbadge{font:600 11px var(--ui);text-transform:uppercase;letter-spacing:.04em;color:var(--mute)}
+.msout{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:13px}
+/* ── calendar page ── */
+.calbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.caltitle{margin:0;font:400 28px/1.1 var(--display);letter-spacing:-.02em;flex:1;min-width:220px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.caltitle b{font-weight:700}.caltitle span{color:var(--red);font-weight:400}.caltitle small{font-size:13px;color:var(--mute);width:100%;letter-spacing:0}
+.seg{display:inline-flex;background:var(--fill2);border-radius:9px;padding:2px;gap:2px}
+.seg button{border:0;background:none;color:var(--text);font:500 12.5px var(--ui);padding:5px 16px;border-radius:7px;cursor:pointer}
+.seg button.on{background:var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.06)}
+.calnav{display:flex;gap:6px;align-items:center}
+.calsrc{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mute);margin:-6px 0 12px}
+.calsrc i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.tg{background:var(--panel);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.tg-head,.tg-all,.tg-body{display:grid;grid-template-columns:56px repeat(var(--n),minmax(0,1fr))}
+.tg-head{border-bottom:1px solid var(--line)}
+.tg-day{padding:8px 4px 8px 10px;display:flex;align-items:center;gap:6px;cursor:pointer;border-left:1px solid var(--line);min-width:0}
+.tg-day span{font-size:12px;color:var(--mute)}.tg-day b{font:500 20px var(--display);height:30px;min-width:30px;display:inline-grid;place-items:center}
+.tg.one .tg-day{cursor:default}
+.tg-day.is-today b{background:var(--red);color:#fff;border-radius:50%;width:30px;height:30px;display:inline-grid;place-items:center;font-size:15px}
+.tg-day.is-today span{color:var(--red)}
+.tg-all{border-bottom:1px solid var(--line)}
+.tg-all > div{padding:3px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:2px;min-width:0}
+.tg-all > .tg-gut{font-size:10.5px;color:var(--mute);padding:6px 6px 0 0;text-align:right;border-left:0}
+.tg-scroll{height:calc(100dvh - 250px);min-height:380px;overflow-y:auto;overscroll-behavior:contain}
+.tg-body{position:relative}
+.tg-gut{position:relative}
+.tg-hr{position:absolute;right:0;left:0}
+.tg-hr span{position:absolute;top:-7px;right:6px;font-size:10.5px;color:var(--mute);font-variant-numeric:tabular-nums}
+.tg-line{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
+.tg-col{position:relative;border-left:1px solid var(--line)}
+.tg-col.is-today{background:color-mix(in srgb,var(--red) 3%,transparent)}
+.cev{position:absolute;border-radius:6px;padding:3px 6px 3px 8px;overflow:hidden;cursor:pointer;font-size:11.5px;line-height:1.3;
+  background:color-mix(in srgb,var(--c) 18%,var(--panel));color:color-mix(in srgb,var(--c) 55%,var(--text));border-left:3px solid var(--c);z-index:1;display:block}
+.cev:hover{background:color-mix(in srgb,var(--c) 28%,var(--panel));z-index:2}
+.cev b{display:block;font-weight:600;color:color-mix(in srgb,var(--c) 40%,var(--text));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cev span{display:block;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cev.free{opacity:.7;border-left-style:dashed}
+.tg-now{position:absolute;left:0;right:0;border-top:2px solid var(--red);z-index:3;pointer-events:none}
+.tg-now i{position:absolute;left:-5px;top:-6px;width:10px;height:10px;border-radius:50%;background:var(--red)}
+.tg-nowlab{position:absolute;right:4px;transform:translateY(-50%);font:600 10.5px var(--ui);color:#fff;background:var(--red);border-radius:5px;padding:1px 4px;z-index:3}
+.pill{font-size:11px;padding:2px 6px;border-radius:5px;background:color-mix(in srgb,var(--c) 85%,transparent);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.mo{background:var(--panel);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.mo-head{display:grid;grid-template-columns:repeat(7,1fr);font-size:12px;color:var(--mute);text-align:right;padding:6px 0}
+.mo-head div{padding-right:10px}
+.mo-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:minmax(92px,calc((100dvh - 290px) / var(--rows)))}
+.mo-cell{border-top:1px solid var(--line);border-left:1px solid var(--line);padding:4px 5px;display:flex;flex-direction:column;gap:2px;min-width:0;cursor:pointer;overflow:hidden}
+.mo-cell:nth-child(7n+1){border-left:0}
+.mo-cell:hover{background:var(--fill2)}
+.mo-cell.out .mo-num{color:var(--dim)}
+.mo-num{text-align:right;font-size:12.5px;margin-bottom:2px}
+.mo-num b{font-weight:500;display:inline-block;min-width:24px;height:24px;line-height:24px;text-align:center;padding:0 4px}
+.mo-cell.is-today .mo-num b{background:var(--red);color:#fff;border-radius:12px}
+.mo-ev{display:flex;align-items:center;gap:5px;font-size:11.5px;min-width:0;border-radius:4px;padding:0 2px}
+.mo-ev:hover{background:var(--fill)}
+.mo-ev i{width:7px;height:7px;border-radius:50%;background:var(--c);flex:none}
+.mo-ev span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mo-ev em{font-style:normal;color:var(--mute);font-size:10.5px;flex:none}
+.mo-more{font-size:11px;color:var(--mute);padding-left:14px}
+.li{display:flex;flex-direction:column;gap:12px}
+.li-day{display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;background:var(--panel);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 18px}
+.li-date{display:flex;gap:10px;align-items:flex-start}
+.li-date b{font:600 26px/1 var(--display)}
+.li-date span{display:flex;flex-direction:column;font-size:13px}.li-date small{color:var(--mute);font-size:12px}
+.li-date.is-today b,.li-date.is-today span{color:var(--red)}
+.li-ev{display:flex;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--line);cursor:pointer}
+.li-ev:first-child{border-top:0}
+.li-ev i{width:4px;align-self:stretch;border-radius:2px;background:var(--c);flex:none}
+.li-t{width:46px;font-size:12.5px;flex:none}.li-t span{color:var(--mute)}
+.li-ev b{font-weight:500;font-size:13.5px}.li-ev .muted{font-size:12px}
+@media(max-width:700px){.li-day{grid-template-columns:1fr}.seg button{padding:5px 10px}}
+.evscrim{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:50;animation:fade .15s}
+.evsheet{position:fixed;z-index:51;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,calc(100vw - 32px));max-height:80dvh;overflow:auto;
+  background:var(--panel);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.35);padding:22px 22px 18px;animation:pop .18s var(--ease)}
+.evbar{width:36px;height:5px;border-radius:3px;background:var(--c);margin-bottom:12px}
+.evsheet h2{margin:0 26px 6px 0;font:600 20px/1.25 var(--display)}
+.evwhen{color:var(--mute);font-size:13.5px;line-height:1.45;margin-bottom:12px}
+.evrow{display:flex;gap:10px;font-size:13.5px;padding:6px 0;border-top:1px solid var(--line)}
+.evnotes{white-space:pre-wrap;font-size:12.5px;color:var(--mute);border-top:1px solid var(--line);padding-top:10px;margin-top:4px;max-height:200px;overflow:auto}
+.evact{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.evx{position:absolute;right:12px;top:12px;font-size:20px}
+@keyframes pop{from{opacity:0;transform:translate(-50%,-48%) scale(.97)}}
+@keyframes fade{from{opacity:0}}
+/* ── today ── */
+.today{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:960px){.today{grid-template-columns:minmax(0,1fr)}}
+.tpanel{padding:18px;margin-bottom:16px}
+.tpanel h3{margin:0 0 4px;font:600 15px var(--display)}
+.tgroup{font:600 11.5px var(--ui);color:var(--mute);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 2px}
+.tgroup.late{color:var(--red)}
+.trow{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.tgroup + .trow{border-top:0}
+.trow input[type=checkbox]{margin-top:3px;flex:none;width:16px;height:16px;accent-color:var(--green)}
+.trow .tx{flex:1;min-width:0;font-size:13.5px;line-height:1.4;overflow-wrap:anywhere}
+.trow.done .tx{color:var(--mute);text-decoration:line-through}
+.trow .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.tadd{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.tadd .inp{flex:1 1 200px}
+.tadd .sel,.tadd input[type=date],.tadd input[type=datetime-local]{flex:0 1 auto;width:auto}
+.scard{padding:14px 16px;border-radius:12px;background:var(--fill2);margin-top:10px}
+.scard .subj{font-weight:600;font-size:13.5px}
+.scard .why{font-size:12px;color:var(--mute);margin-top:2px}
+.sitem{display:flex;gap:8px;align-items:center;padding:6px 0;font-size:13px}
+.sitem .tx{flex:1;min-width:0}
+.conf{font:600 10.5px var(--ui);padding:2px 7px;border-radius:6px;text-transform:uppercase}
+.conf.high{background:color-mix(in srgb,var(--green) 16%,transparent);color:var(--green)}
+.conf.medium{background:color-mix(in srgb,var(--orange) 16%,transparent);color:var(--orange)}
+.conf.low{background:color-mix(in srgb,var(--pink) 16%,transparent);color:var(--pink)}
+.ibtn{border:0;background:var(--panel);color:var(--text);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;flex:none}
+.ibtn.ok{color:var(--green)} .ibtn:hover{background:var(--fill)}
+.mrow{display:flex;gap:12px;align-items:center;padding:9px 0 9px 12px;border-top:1px solid var(--line);position:relative;cursor:pointer}
+.mrow::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:4px;border-radius:2px;background:var(--c)}
+.mrow:hover{background:var(--fill2);border-radius:8px}
+.mrow:first-child{border-top:0}
+.mrow .mt{flex:none;width:46px;font-size:12.5px;line-height:1.35}
+.mrow .mt span{color:var(--mute);font-size:11.5px}
+.mrow .mb{flex:1;min-width:0}
+.mrow .mtitle{font-size:13.5px;font-weight:500;overflow-wrap:anywhere}
+.mrow.past{opacity:.45}
+.mrow.live .mtitle{color:var(--green)}
+.mrow.free .mtitle{font-weight:400;color:var(--mute)}
+.nowline{display:flex;align-items:center;gap:8px;color:var(--red);font:600 11px var(--ui);margin:2px 0}
+.nowline::after{content:"";flex:1;height:1.5px;background:var(--red)}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:12px}
+.wday{border:0;background:var(--fill2);border-radius:10px;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;color:var(--text)}
+.wday small{font-size:10.5px;color:var(--mute)} .wday b{font:600 14px var(--display)} .wday i{font-style:normal;font-size:10px;color:var(--mute)}
+.wday.on{background:var(--blue);color:#fff} .wday.on small,.wday.on i{color:rgba(255,255,255,.8)}
+.ibtn:disabled{opacity:.35;cursor:default}
+.tdone{overflow-y:auto;overscroll-behavior:contain}
+.tdone .trow:first-child{border-top:0}
+.tnotes{width:100%;min-height:120px;resize:vertical}
+.needrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);cursor:pointer}
+.needrow:first-of-type{border-top:0}
 </style>
 </head>
 <body>
@@ -435,6 +617,9 @@ const STATUS = ["todo","running","review","needs_changes","blocked","done"];
 const SLABEL = {todo:"Todo",running:"Running",review:"Review",needs_changes:"Needs changes",blocked:"Blocked",done:"Done",cancelled:"Cancelled"};
 const SCOL = s => `var(--s-${s})`;
 const ICONS = {
+  calendar:'<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  today:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/>',
   overview:'<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
   phases:'<rect x="3" y="4.5" width="9" height="4" rx="2"/><rect x="8" y="10" width="10" height="4" rx="2"/><rect x="13" y="15.5" width="8" height="4" rx="2"/>',
   board:'<rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="4" height="8" rx="1"/>',
@@ -443,13 +628,14 @@ const ICONS = {
   feed:'<path d="M4 6h16M4 12h10M4 18h13"/>',
   comms:'<path d="M21 12a8 8 0 0 1-11.8 7L3 21l2-5.5A8 8 0 1 1 21 12z"/>'
 };
-const VIEWS = [["overview","All Projects"],["comms","Chat"],["phases","Timeline"],["board","Board"],["agents","Agents"],["tokens","Usage"],["feed","Activity"]];
+const GLOBAL = new Set(["overview","today","calendar"]);
+const VIEWS = [["today","Today"],["calendar","Calendar"],["overview","All Projects"],["comms","Chat"],["phases","Timeline"],["board","Board"],["agents","Agents"],["tokens","Usage"],["feed","Activity"],["settings","Settings"]];
 const EVI = {init:["◎","var(--cyan)"],plan:["⌘","var(--violet)"],task_added:["+","var(--violet)"],run_started:["▶","var(--cyan)"],report:["✎","var(--violet)"],
   check:["✓","var(--lime)"],approved:["★","var(--lime)"],changes:["↺","var(--amber)"],question:["?","var(--magenta)"],answer:["↳","var(--cyan)"],
   note:["✉","var(--blue)"],error:["!","var(--red)"],stopped:["■","var(--amber)"],cancelled:["✕","var(--red)"],decision:["◆","var(--violet)"],
   checkpoint:["⧉","var(--mute)"],autopilot:["⟳","var(--cyan)"],task_updated:["⚙","var(--mute)"]};
 
-let S = {projects:[], cur:null, st:null, view: lsGet("mc.view") || "phases", drawer:null, feedFilter:"all", drafts:{}, logs:{}, logAttempt:null, hashes:{}};
+let S = {calMode: lsGet("mc.calmode") || "week", calA: null, projects:[], cur:null, st:null, view: "today", drawer:null, feedFilter:"all", drafts:{}, logs:{}, logAttempt:null, hashes:{}};
 
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
@@ -487,6 +673,9 @@ async function tick(){
     const cp = S.projects.find(p=>p.path===S.cur);
     S.st = cp && cp.initialized ? await api("/api/state?p="+encodeURIComponent(S.cur)) : null;
     if(S.view==="tokens") await loadUsage();
+    if(S.view==="today") S.today=await api("/api/today").catch(()=>S.today);
+    if(S.view==="calendar") await loadCal();
+    if(S.view==="settings"){ S.notify=await api("/api/notify").catch(()=>S.notify); if(S.st) S.snaps=await api("/api/snapshots?p="+encodeURIComponent(S.cur)).catch(()=>S.snaps); }
     $("offline").style.display="none";
     render();
     if(S.drawer) refreshLog();
@@ -499,20 +688,24 @@ function changed(key, data){ const h=JSON.stringify(data); if(S.hashes[key]===h)
 
 function render(){
   renderNav(); renderHeader();
-  const v = S.view, cp = S.projects.find(p=>p.path===S.cur), splash = cp && !cp.initialized && v!=="overview";
-  const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
-  if(changed("main", [splash?"ignite":v, S.cur, data])){
+  const v = S.view, cp = S.projects.find(p=>p.path===S.cur), splash = cp && !cp.initialized && !GLOBAL.has(v);
+  const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="phases"||v==="board" ? [S.st?.tasks,S.st?.mission,S.ms,S.st?.plan_permissions,S.cur] : v==="calendar" ? [S.calMode,S.calA,S.calData,S.calEvt?.uid,S.calEvt?.start] : v==="today" ? [S.today, S.calDay, S.calEvt?.uid, S.calEvt?.start, S.projects.map(p=>[p.name,p.needs_you,p.phase,p.counts])] : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
+  if(changed("main", [splash?"ignite":v, S.cur, data, v==="settings"?[S.notify,S.snaps,S.snapOpen,S.snapChanges,S.st?.access,S.st?.mission,S.st?.supervisor]:0])){
     const act = document.activeElement, aid = act && act.id, sel = act && act.selectionStart;
-    const cl=$("chatlog"), stick=!cl || cl.scrollTop+cl.clientHeight>=cl.scrollHeight-40, qsTop=$("qscroll")?.scrollTop||0;
+    const cl=$("chatlog"), stick=!cl || S.chatBottom || cl.scrollTop+cl.clientHeight>=cl.scrollHeight-60, clTop=cl?.scrollTop||0, sideTop=document.querySelector(".side")?.scrollTop||0, doneTop=document.querySelector(".tdone")?.scrollTop||0, calTop=$("calScroll")?.scrollTop, qsTop=$("qscroll")?.scrollTop||0;
     $("main").innerHTML = `<div class="wrap">${splash ? viewIgnite(cp) : (VIEW_FN[v]||viewPhases)()}</div>`;
-    if($("chatlog") && stick) $("chatlog").scrollTop=$("chatlog").scrollHeight;
+    const ncl=$("chatlog"); if(ncl){ if(stick){ ncl.scrollTop=ncl.scrollHeight; requestAnimationFrame(()=>{ ncl.scrollTop=ncl.scrollHeight; }); } else ncl.scrollTop=clTop; S.chatBottom=false; updateJump(); }
+    const nside=document.querySelector(".side"); if(nside) nside.scrollTop=sideTop;
+    if(document.querySelector(".tdone")) requestAnimationFrame(()=>{ capDone(); const b=document.querySelector(".tdone"); if(b) b.scrollTop=doneTop; });
+    const cb=$("chat-box"); if(cb) growBox(cb);
+    const cs=$("calScroll"); if(cs){ if(calTop===undefined||S.calScrollInit){ const today=cs.querySelector(".tg-col.is-today"); const n=S.calData?.now; cs.scrollTop=Math.max(0,((today&&n?mins(n)/60:8)-1.5)*CAL_H); S.calScrollInit=false; } else cs.scrollTop=calTop; }
     if($("qscroll")) $("qscroll").scrollTop=qsTop;
     if(v==="agents") hydrateTerms();
     if(aid && $(aid)){ $(aid).focus(); try{ $(aid).setSelectionRange(sel,sel); }catch(e){} }
   }
   if(S.drawer) renderDrawer();
 }
-const VIEW_FN = {overview:viewOverview, phases:viewPhases, board:viewBoard, agents:viewAgents, tokens:viewTokens, feed:viewFeed, comms:viewComms};
+const VIEW_FN = {calendar:viewCalendar, settings:viewSettings, today:viewToday, overview:viewOverview, phases:viewPhases, board:viewBoard, agents:viewAgents, tokens:viewTokens, feed:viewFeed, comms:viewComms};
 
 function renderNav(){
   const needs = (S.st?.questions||[]).filter(q=>q.to==="user"&&q.status==="open").length + (S.st?.mission.phase==="awaiting_approval"?1:0);
@@ -520,15 +713,15 @@ function renderNav(){
   if($("nav").innerHTML!==html) $("nav").innerHTML = html;
   const pl = S.projects.map(p=>{ const pct=p.total?Math.round(p.counts.done/p.total*100):0;
     const col=!p.initialized?"var(--s-cancelled)":p.supervisor?.running||p.counts?.running?"var(--blue)":p.needs_you||p.phase==="awaiting_approval"?"var(--orange)":pct===100?"var(--green)":"var(--s-todo)";
-    return `<div class="pwrap"><button class="pitem ${p.path===S.cur&&S.view!=="overview"?"active":""}" data-proj="${esc(p.path)}"><i class="dot" style="background:${col}"></i><span class="nm">${esc(p.name)}</span>${p.needs_you?`<em class="badge">${p.needs_you}</em>`:p.initialized&&p.total?`<span class="pct">${pct}%</span>`:""}</button><button class="premove-s" data-remove="${esc(p.path)}" title="Remove from dashboard" aria-label="Remove ${esc(p.name)} from the dashboard">×</button></div>`; }).join("");
+    return `<div class="pwrap"><button class="pitem ${p.path===S.cur&&!GLOBAL.has(S.view)?"active":""}" data-proj="${esc(p.path)}"><i class="dot" style="background:${col}"></i><span class="nm">${esc(p.name)}</span>${p.needs_you?`<em class="badge">${p.needs_you}</em>`:p.initialized&&p.total?`<span class="pct">${pct}%</span>`:""}</button><button class="premove-s" data-remove="${esc(p.path)}" title="Remove from dashboard" aria-label="Remove ${esc(p.name)} from the dashboard">×</button></div>`; }).join("");
   if($("projList").innerHTML!==pl) $("projList").innerHTML = pl;
   const cp=S.projects.find(p=>p.path===S.cur);
-  $("tbTitle").textContent = S.view==="overview" ? "All Projects" : (cp?.name || "Mission Control");
-  const gb=S.view!=="overview"&&gitInfo()?.branch;
-  $("tbSub").textContent = S.view==="overview" ? "" : (gb ? `⑂ ${gb}  ·  ` : "") + (cp?.goal || cp?.path || "");
+  $("tbTitle").textContent = S.view==="overview" ? "All Projects" : S.view==="today" ? "Today" : S.view==="calendar" ? "Calendar" : (cp?.name || "Mission Control");
+  const gb=!GLOBAL.has(S.view)&&gitInfo()?.branch;
+  $("tbSub").textContent = GLOBAL.has(S.view) ? "" : (gb ? `⑂ ${gb}  ·  ` : "") + (cp?.goal || cp?.path || "");
 }
 function renderHeader(){
-  const st=S.view==="overview"?null:S.st; if(!st){ if(changed("header","")) $("hstats").innerHTML=""; return; }
+  const st=GLOBAL.has(S.view)?null:S.st; if(!st){ if(changed("header","")) $("hstats").innerHTML=""; return; }
   const sp=st.supervisor||{}, gated=["briefing","awaiting_approval"].includes(st.mission.phase);
   const ts_=st.tasks, done=ts_.filter(t=>t.status==="done").length, run=ts_.filter(t=>t.status==="running"&&t.executor!=="human").length;
   const tok=ts_.reduce((a,t)=>a+tokIn(t.tokens||{})+(t.tokens?.output||0),0), cost=ts_.reduce((a,t)=>a+(t.tokens?.cost_usd||0),0);
@@ -601,9 +794,41 @@ function schedule(tasks){
   while(cur.length){ const nx=[]; cur.forEach(id=>{ if(crit.has(id)) return; crit.add(id); (by[id].depends_on||[]).forEach(d=>{ if(by[d]&&end[d]===start[id]) nx.push(d); }); }); cur=nx; }
   return {start,end,total,crit};
 }
+/* ── work packages and milestones ── */
+const MS_LABEL={planning:"Planning",awaiting_approval:"Awaiting approval",executing:"Running",review:"In review",done:"Done"};
+const MS_ICON={planning:"○",awaiting_approval:"◔",executing:"▶",review:"◎",done:"✓"};
+function msAll(st){ return st.mission.milestones||[]; }
+function msMany(st){ return msAll(st).length>1||(st.mission.wps||[]).length>1; }
+function msCurrent(st){
+  const all=msAll(st); if(!all.length) return null;
+  if(S.ms&&(S.ms==="all"||all.some(x=>x.id===S.ms))) return S.ms;
+  for(const want of [["review"],["executing"],["awaiting_approval","planning"]]){ const x=all.find(m=>want.includes(m.status)); if(x) return x.id; }
+  return all[all.length-1].id;
+}
+function msTasks(st, allowAll){
+  const cur=msCurrent(st); if(!msMany(st)||!cur||(allowAll&&cur==="all")) return st.tasks;
+  const mine=st.tasks.filter(t=>(t.milestone||"M1.1")===cur), ids=new Set(mine.map(t=>t.id)), memo={};
+  const lvl=t=>memo[t.id]??=((t.depends_on||[]).filter(d=>ids.has(d)).map(d=>lvl(mine.find(x=>x.id===d))).reduce((a,b)=>Math.max(a,b+1),0));
+  return mine.map(t=>({...t,phase:lvl(t)}));   // phases restart inside each milestone
+}
+function msBar(st, allowAll){
+  if(!msMany(st)) return "";
+  const cur=msCurrent(st), wps=st.mission.wps||[], ms=msAll(st);
+  const rows=wps.map(w=>`<div class="msrow"><div class="mswp"><b>${esc(w.id)}</b> ${esc(w.title)}${w.status==="done"?' <span class="tag">closed</span>':""}</div><div class="mspills">${
+    ms.filter(x=>x.wp===w.id).map(x=>{ const n=st.tasks.filter(t=>(t.milestone||"M1.1")===x.id), d=n.filter(t=>t.status==="done").length;
+      return `<button class="mspill s-${x.status} ${cur===x.id?"on":""}" data-ms="${esc(x.id)}" title="${esc(MS_LABEL[x.status]||x.status)}"><i>${MS_ICON[x.status]||"·"}</i><span><b>${esc(x.id)}</b> ${esc(x.title)}</span><em>${d}/${n.length}</em></button>`; }).join("")||'<span class="muted" style="font-size:12px">No milestone yet</span>'}</div></div>`).join("");
+  const sel=ms.find(x=>x.id===cur);
+  const card=sel?`<div class="mscard s-${sel.status}"><div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><span class="msbadge">${MS_ICON[sel.status]} ${esc(MS_LABEL[sel.status]||sel.status)}</span><b style="font-size:15px">${esc(sel.id)} · ${esc(sel.title)}</b></div>
+      ${sel.goal?`<div style="font-size:13px;margin-top:6px">${esc(sel.goal)}</div>`:""}
+      ${sel.done_when?.length?`<div class="muted" style="font-size:12.5px;margin-top:4px">Done when: ${sel.done_when.map(esc).join(" · ")}</div>`:""}
+      ${sel.status==="review"?`<div style="font-size:12.5px;margin-top:8px;color:var(--purple)">All tasks are finished. The supervisor is checking the result and will write the outcome, then propose what comes next.</div>`:""}
+      ${sel.outcome?`<div class="msout"><div class="label">Outcome</div>${md(sel.outcome)}</div>`:""}</div>`:"";
+  return `<div class="msbar">${rows}${allowAll?`<button class="mspill ${cur==="all"?"on":""}" data-ms="all" style="margin-top:6px"><span>All milestones</span></button>`:""}</div>${cur==="all"?"":card}`;
+}
 function viewPhases(){
   const st=S.st; if(!st) return head("Timeline","")+noMission();
-  const tasks=st.tasks.filter(t=>t.status!=="cancelled");
+  const tasks=msTasks(st).filter(t=>t.status!=="cancelled");
+  if(!tasks.length && msMany(st)) return head("Timeline","")+approveBanner()+msBar(st)+`<div class="empty">No tasks planned in this milestone yet.</div>`;
   if(!tasks.length) return head("Timeline","")+`<div class="empty">No plan yet. ${st.mission.phase==="briefing"?'Your supervisor is in its briefing. Tell it your goal in <a href="#" data-view="comms">Chat</a>.':"The supervisor hasn't planned any tasks yet."}</div>`;
   const {start,end,total,crit}=schedule(tasks);
   const phases={}; tasks.forEach(t=>(phases[t.phase]=phases[t.phase]||[]).push(t));
@@ -642,7 +867,7 @@ function viewPhases(){
     return `<div class="panel phase-chip"><div class="label">Phase ${l+1}</div><div style="display:flex;align-items:baseline;gap:8px;margin-top:2px"><span class="n">${d}/${ts_.length}</span><span class="muted" style="font-size:12px">done</span></div><div class="bar"><i style="width:${d/ts_.length*100}%;background:var(--green)"></i></div></div>`; }).join("");
   return head("Timeline", "Tasks that can run in parallel start together. Dependent tasks start after the tasks they wait for.",
       `<div class="gstats"><span class="tag">${tasks.length} tasks</span><span class="tag">${levels.length} phases</span><span class="tag">up to ${maxPar} in parallel</span><span class="tag" style="color:var(--crit)">critical path: ${crit.size} tasks</span></div>`)
-    + approveBanner() + prBanner() + `<div class="phase-strip">${strip}</div><div class="panel gantt-wrap">${svg}</div>
+    + approveBanner() + prBanner() + msBar(st) + `<div class="phase-strip">${strip}</div><div class="panel gantt-wrap">${svg}</div>
     <div class="legend">${STATUS.map(s=>`<span><i style="background:${SCOL(s)}"></i>${SLABEL[s]}</span>`).join("")}<span><i style="background:var(--crit)"></i>Critical path</span><span>Columns are estimate points</span></div>`;
 }
 const cssCache={}; function getCss(v){ return cssCache[v] ??= (getComputedStyle(document.documentElement).getPropertyValue(v).trim().startsWith("var(") ? getCss(getComputedStyle(document.documentElement).getPropertyValue(v).trim().slice(4,-1)) : getComputedStyle(document.documentElement).getPropertyValue(v).trim()); }
@@ -652,8 +877,9 @@ const trunc=(s,n)=>s.length>n?s.slice(0,n-1)+"…":s;
 function viewBoard(){
   const st=S.st; if(!st) return head("Board","")+noMission();
   const deps = t => (t.depends_on||[]).filter(d=>st.tasks.find(x=>x.id===d)?.status!=="done");
-  return head("Board", "Every task by status. Open a card for its live transcript, report and tokens.") + `<div class="board">` + STATUS.map(s=>{
-    const items=st.tasks.filter(t=>t.status===s);
+  const bt=msTasks(st,true);
+  return head("Board", "Every task by status. Open a card for its live transcript, report and tokens.") + msBar(st,true) + `<div class="board">` + STATUS.map(s=>{
+    const items=bt.filter(t=>t.status===s);
     return `<div class="panel col"><div class="col-h"><b><i class="cdot" style="background:${SCOL(s)}"></i>${SLABEL[s]}</b><span>${items.length}</span></div>` + items.map(t=>{
       const waiting=deps(t), ready=st.ready.includes(t.id);
       return `<div class="card ${t.status}" data-task="${t.id}">
@@ -795,10 +1021,16 @@ function permRows(list,checks){
     <code>${esc(p.rule)}</code>${p.why?`<div class="muted" style="font-size:12px">${esc(p.why)}</div>`:""}<div class="pr-risk">${esc(p.risk)}</div></div>`).join("")}</div>`;
 }
 function approveBanner(){
-  const st=S.st; if(st?.mission.phase!=="awaiting_approval") return "";
-  const n=st.tasks.filter(t=>t.status!=="cancelled").length, ph=new Set(st.tasks.map(t=>t.phase)).size, pp=st.plan_permissions||[];
+  const st=S.st; if(!st) return "";
+  const waiting=msAll(st).filter(x=>x.status==="awaiting_approval");
+  if(st.mission.phase!=="awaiting_approval"&&!waiting.length) return "";
+  const ids=new Set(waiting.map(x=>x.id)), pt=waiting.length?st.tasks.filter(t=>ids.has(t.milestone||"M1.1")&&t.status!=="cancelled"):st.tasks.filter(t=>t.status!=="cancelled");
+  const n=pt.length, ph=new Set(pt.map(t=>t.phase)).size, pp=st.plan_permissions||[];
+  const prev=waiting.map(w=>msAll(st).filter(x=>x.wp===w.wp&&x.status==="done").pop()).filter(Boolean);
+  const which=msMany(st)&&waiting.length?`<div style="font-size:13px;margin-top:6px">${waiting.map(w=>`<b>${esc(w.id)} ${esc(w.title)}</b>${w.goal?" · "+esc(w.goal):""}`).join("<br>")}</div>`+
+    (prev.length?`<details style="margin-top:6px"><summary class="muted" style="font-size:12.5px;cursor:pointer">What the previous milestone found</summary>${prev.map(x=>`<div style="font-size:12.5px;margin-top:4px"><b>${esc(x.id)}</b> ${md(x.outcome||"")}</div>`).join("")}</details>`:""):"";
   return `<div class="panel approve"><div><div class="label" style="color:var(--cyan)">Plan ready for launch</div>
-    <div style="font-size:15px;font-weight:600;margin-top:4px">${n} tasks · ${ph} phase${ph>1?"s":""} · nothing runs until you approve</div>
+    <div style="font-size:15px;font-weight:600;margin-top:4px">${n} tasks · ${ph} phase${ph>1?"s":""} · nothing runs until you approve</div>${which}
     <div class="muted" style="font-size:12.5px">Check the timeline in <a href="#" data-view="phases">Phases</a>. Want changes? Just tell the supervisor in chat.</div></div>
     <button class="btn primary launch" id="approveBtn">✓ ${pp.length?"Approve, allow & launch":"Approve & launch"}</button>
     ${pp.length?`<div class="approve-perms"><div class="label">This plan needs ${pp.length} permission${pp.length>1?"s":""} · untick any you don't want to give</div>${permRows(pp,true)}</div>`:""}</div>`;
@@ -832,6 +1064,247 @@ function watchPanel(){
       <button class="x2" data-wcancel="${esc(w.id)}" aria-label="Stop waiting for ${esc(w.name)}" title="Stop waiting">×</button></div>`).join("")}
     ${done.map(w=>`<div class="wrow done"><span style="color:${w.reason==="done"?"var(--green)":"var(--orange)"}">${w.reason==="done"?"✓":"⚠"}</span><div style="flex:1"><span>${esc(w.name)}</span> <span class="muted" style="font-size:12px">· ${w.reason==="done"?"ready":w.reason==="failed"?"failed":"timed out"} ${ago(w.fired_at)} ago</span></div></div>`).join("")}</div>`;
 }
+function notifyPanel(){
+  const n=S.notify; if(!n) return "";
+  const ch=n.channels, field={slack:["url","Slack or Discord webhook URL"],webhook:["url","Webhook URL (receives JSON)"],ntfy:["topic","ntfy topic (phone push)"]};
+  const row=(name,label)=>{ const c=ch[name], f=field[name];
+    return `<div class="lrow"><div style="min-width:0;flex:1"><div style="font-weight:500;font-size:13.5px">${label}</div>`
+      +(f?`<div style="display:flex;gap:6px;margin-top:4px"><input class="inp" data-draft="nf-${name}" placeholder="${c.set?esc(c.hint)+" (saved; type to replace)":f[1]}" value="${esc(S.drafts["nf-"+name]||"")}"><button class="btn sm" data-nsave="${name}">Save</button></div>`
+        :`<div class="muted" style="font-size:12px">${n.available.desktop?"A system notification on this computer.":"Not supported on this system (macOS and Linux only)."}</div>`)
+      +`</div><input type="checkbox" data-nchan="${name}" aria-label="${label}" ${c.on?"checked":""} ${name==="desktop"&&!n.available.desktop?"disabled":""}></div>`; };
+  return `<div class="panel qcard"><div class="label">Notifications <span class="muted" style="font-weight:400">· all projects</span></div>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px">Get pinged when you're needed, so long runs don't wait on you. Messages include task summaries, so only use channels you trust.</p>
+    <div class="lrow"><div style="font-weight:500;font-size:13.5px">Notifications</div><input type="checkbox" data-nmaster aria-label="Notifications" ${n.enabled?"checked":""}></div>
+    ${row("desktop","Desktop")}${row("ntfy","Phone (ntfy)")}${row("slack","Slack / Discord")}${row("webhook","Webhook")}
+    <div class="label" style="margin:12px 0 4px">Tell me when</div>
+    ${Object.entries(n.kind_labels).map(([k,l])=>`<label class="lrow" style="cursor:pointer"><span style="font-size:13px">${esc(l)}</span><input type="checkbox" data-nkind="${k}" ${n.kinds[k]?"checked":""}></label>`).join("")}
+    <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn sm" id="notifyTest">Send a test</button></div></div>`;
+}
+/* ── today ── */
+function dfmt(d){ if(!d) return ""; const x=new Date(d.length>10?d:d+"T00:00"); return x.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"})+(d.length>10?" "+x.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"}):""); }
+function projName(path){ return (S.today?.projects||[]).find(p=>p.path===path)?.name; }
+function projSelect(attr, cur, extra=""){ const ps=S.today?.projects||[];
+  return `<select class="sel" ${attr} ${extra}><option value="">No project</option>${ps.map(p=>`<option value="${esc(p.path)}" ${p.path===cur?"selected":""}>${esc(p.name)}</option>`).join("")}</select>`; }
+function itemRow(it){
+  const pn=projName(it.project), late=it.due&&!it.done&&it.due<S.today.now.slice(0,10);
+  return `<div class="trow ${it.done?"done":""}"><input type="checkbox" data-tdone="${esc(it.id)}" ${it.done?"checked":""} aria-label="Done">
+    <div class="tx">${esc(it.text)}<div class="meta">${pn?`<span class="tag">${esc(pn)}</span>`:""}${it.due?`<span class="tag" style="${late?"color:var(--red)":""}">${late?"was due ":"due "}${dfmt(it.due)}</span>`:""}${it.remind_at?`<span class="tag">⏰ ${dfmt(it.remind_at)}</span>`:""}${it.source?`<span class="tag" title="From: ${esc(it.source.from||"")}">✉ ${esc(short(it.source.subject||it.source.file,40))}</span>`:""}</div></div>
+    <button class="x2" data-tact="del" data-id="${esc(it.id)}" aria-label="Delete">×</button></div>`;
+}
+function short(t,n){ t=String(t||""); return t.length>n?t.slice(0,n-1)+"…":t; }
+function calPanel(T){
+  const C=T.calendar||{days:{},sources:[]}, off=S.calDay||0;
+  const base=new Date(T.now.slice(0,10)+"T00:00"), plus=i=>new Date(base.getFullYear(),base.getMonth(),base.getDate()+i), day=plus(off), key=day.toLocaleDateString("sv-SE");
+  const label=off===0?"Today":off===1?"Tomorrow":day.toLocaleDateString(undefined,{weekday:"long"});
+  const list=C.days[key]||[], allday=list.filter(o=>o.all_day), timed=list.filter(o=>!o.all_day);
+  if(!C.sources.length) return `<div class="panel tpanel"><h3>Calendar</h3><p class="muted" style="font-size:12.5px;margin:4px 0 0">Add your calendar to see today's meetings and get a ping before each one. In Calendar or Outlook, export it as an <b>.ics</b> file, then drop it into your inbox folder or add its path in <b>Settings</b> below. It's read on this computer only.</p></div>`;
+  let nowDrawn=off!==0;
+  const rows=timed.map(o=>{ const past=off===0&&o.end<=T.now, live=off===0&&o.start<=T.now&&T.now<o.end;
+    let line=""; if(!nowDrawn&&off===0&&o.start>T.now){ line=`<div class="nowline"><span>now ${T.now.slice(11)}</span></div>`; nowDrawn=true; }
+    if(live) nowDrawn=true;
+    return line+`<div class="mrow ${past?"past":""} ${live?"live":""} ${o.free?"free":""}" style="--c:${evColor(o)}" data-ev="${esc(o.uid)}|${esc(o.start)}"><div class="mt mono">${o.start.slice(11)}<br><span>${o.end.slice(0,10)===o.start.slice(0,10)?o.end.slice(11):"→ "+dfmt(o.end.slice(0,10))}</span></div>
+      <div class="mb"><div class="mtitle">${esc(o.title)}${live?' <span class="tag" style="color:var(--green)">now</span>':""}</div>
+      <div class="meta">${o.location&&!/^https?:/.test(o.location)?`<span class="tag">📍 ${esc(short(o.location,48))}</span>`:""}${o.attendees>1?`<span class="tag">${o.attendees} people</span>`:""}${o.free?'<span class="tag">free</span>':""}</div></div>
+      ${o.join&&!past?`<a class="btn sm ${live||(off===0&&o.start>T.now&&minsUntil(T.now,o.start)<=15)?"primary":""}" href="${esc(o.join)}" target="_blank" rel="noopener noreferrer">Join</a>`:""}</div>`; }).join("");
+  const week=[...Array(7)].map((_,i)=>{ const d=plus(i), k=d.toLocaleDateString("sv-SE"), n=(C.days[k]||[]).filter(o=>!o.all_day).length;
+    return `<button class="wday ${i===off?"on":""}" data-calday="${i}"><small>${i===0?"Today":d.toLocaleDateString(undefined,{weekday:"short"})}</small><b>${d.getDate()}</b><i>${n?n+(n===1?" mtg":" mtgs"):"·"}</i></button>`; }).join("");
+  return `<div class="panel tpanel"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3>Calendar · ${label}</h3>
+      <span style="display:flex;gap:4px;align-items:center"><button class="btn sm" data-view="calendar" title="Day, week and month views">Open calendar</button><button class="ibtn" data-calday="${Math.max(0,off-1)}" ${off===0?"disabled":""} aria-label="Previous day">‹</button><button class="ibtn" data-calday="${Math.min(14,off+1)}" ${off>=14?"disabled":""} aria-label="Next day">›</button></span></div>
+    <div class="muted" style="font-size:12.5px">${day.toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})}${timed.length?` · ${timed.length} meeting${timed.length===1?"":"s"}`:""}</div>
+    ${allday.length?`<div class="meta" style="margin-top:8px">${allday.map(o=>`<span class="tag" style="color:var(--text)">${esc(o.title)}</span>`).join("")}</div>`:""}
+    <div style="margin-top:6px">${rows||`<div class="muted" style="font-size:13px;padding:10px 0">No meetings${off===0?" today":""}.</div>`}${!nowDrawn&&timed.length?`<div class="nowline"><span>now ${T.now.slice(11)}</span></div>`:""}</div>
+    <div class="week">${week}</div></div>`;
+}
+function minsUntil(now,t){ return (new Date(t)-new Date(now))/60000; }
+/* ── calendar page (Day · Week · Month · List) ── */
+const CAL_H=52, CALC=["var(--blue)","var(--purple)","var(--orange)","var(--green)","var(--pink)","var(--teal)","var(--indigo)"];
+const dP=s=>{ const [y,m,d]=s.slice(0,10).split("-").map(Number); return new Date(y,m-1,d); };
+const dS=d=>d.toLocaleDateString("sv-SE");
+const dAdd=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
+const monday=d=>dAdd(d,-((d.getDay()+6)%7));
+const mins=t=>+t.slice(11,13)*60+ +t.slice(14,16);
+function evColor(o){ return o.free?"var(--s-todo)":CALC[(o.cal||0)%CALC.length]; }
+function calRange(){
+  const a=dP(S.calA), m=S.calMode;
+  if(m==="day") return [a,a];
+  if(m==="week"){ const w=monday(a); return [w,dAdd(w,6)]; }
+  if(m==="month"){ const g=monday(new Date(a.getFullYear(),a.getMonth(),1)); return [g,dAdd(g,41)]; }
+  return [a,dAdd(a,30)];
+}
+async function loadCal(){
+  if(!S.calA) S.calA=dS(new Date());
+  const [a,b]=calRange();
+  const r=await api(`/api/calendar?from=${dS(a)}&to=${dS(b)}`).catch(()=>null);
+  if(r) S.calData=r;
+}
+function isoWeek(d){ const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()+3-((d.getDay()+6)%7))); const y=new Date(Date.UTC(t.getUTCFullYear(),0,4)); return 1+Math.round(((t-y)/864e5-3+((y.getUTCDay()+6)%7))/7); }
+function calTitle(){
+  const a=dP(S.calA), m=S.calMode, mon=x=>x.toLocaleDateString(undefined,{month:"long"});
+  if(m==="day") return `<b>${a.toLocaleDateString(undefined,{day:"numeric",month:"long"})}</b> <span>${a.getFullYear()}</span><small>${a.toLocaleDateString(undefined,{weekday:"long"})}</small>`;
+  if(m==="week"){ const [x,y]=calRange(); return `<b>${mon(x)}${x.getMonth()!==y.getMonth()?" – "+mon(y):""}</b> <span>${y.getFullYear()}</span><small>Week ${isoWeek(x)}</small>`; }
+  if(m==="month") return `<b>${mon(a)}</b> <span>${a.getFullYear()}</span>`;
+  return `<b>Upcoming</b> <span>30 days</span>`;
+}
+function layoutDay(evs){
+  const list=evs.map(o=>({o,s:mins(o.start),e:o.end.slice(0,10)>o.start.slice(0,10)?1440:Math.max(mins(o.end),mins(o.start)+15)})).sort((x,y)=>x.s-y.s||y.e-x.e);
+  let group=[], end=-1;
+  const flush=()=>{ const cols=[]; group.forEach(x=>{ let i=cols.findIndex(c=>c<=x.s); if(i<0){ i=cols.length; cols.push(0); } cols[i]=x.e; x.col=i; }); group.forEach(x=>x.n=cols.length); group=[]; };
+  list.forEach(x=>{ if(group.length&&x.s>=end){ flush(); end=-1; } group.push(x); end=Math.max(end,x.e); }); flush();
+  return list;
+}
+function evBlock(x){
+  const o=x.o, c=evColor(o), h=Math.max(20,(x.e-x.s)/60*CAL_H-2), tight=h<38;
+  return `<div class="cev ${o.free?"free":""}" data-ev="${esc(o.uid)}|${esc(o.start)}" style="--c:${c};top:${x.s/60*CAL_H}px;height:${h}px;left:calc(${x.col/x.n*100}% + 2px);width:calc(${100/x.n}% - 4px)" title="${esc(o.title)}">
+    <b>${esc(o.title)}</b>${tight?"":`<span>${o.start.slice(11)}–${o.end.slice(11)}</span>${o.location&&h>56?`<span>${esc(o.location)}</span>`:""}`}</div>`;
+}
+function timeGrid(days){
+  const D=S.calData?.days||{}, now=S.calData?.now||"", today=now.slice(0,10);
+  const head=`<div class="tg-head"><div class="tg-gut"></div>${days.map(d=>{ const k=dS(d);
+    return `<div class="tg-day ${k===today?"is-today":""}" data-calgo="${k}"><span>${d.toLocaleDateString(undefined,{weekday:"short"})}</span><b>${d.getDate()}</b></div>`; }).join("")}</div>`;
+  const alld=days.map(d=>(D[dS(d)]||[]).filter(o=>o.all_day));
+  const allRow=alld.some(l=>l.length)?`<div class="tg-all"><div class="tg-gut">all-day</div>${alld.map(l=>`<div>${l.map(o=>`<div class="pill" style="--c:${evColor(o)}" data-ev="${esc(o.uid)}|${esc(o.start)}">${esc(o.title)}</div>`).join("")}</div>`).join("")}</div>`:"";
+  const hours=[...Array(24)].map((_,h)=>`<div class="tg-hr" style="top:${h*CAL_H}px"><span>${h?String(h).padStart(2,"0")+":00":""}</span></div>`).join("");
+  const lines=[...Array(24)].map((_,h)=>`<div class="tg-line" style="top:${h*CAL_H}px"></div>`).join("");
+  const cols=days.map(d=>{ const k=dS(d), timed=(D[k]||[]).filter(o=>!o.all_day);
+    const nowl=k===today?`<div class="tg-now" style="top:${mins(now)/60*CAL_H}px"><i></i></div>`:"";
+    return `<div class="tg-col ${k===today?"is-today":""}">${lines}${layoutDay(timed).map(evBlock).join("")}${nowl}</div>`; }).join("");
+  const nowLab=days.some(d=>dS(d)===today)?`<div class="tg-nowlab" style="top:${mins(now)/60*CAL_H}px">${now.slice(11)}</div>`:"";
+  return `<div class="tg ${days.length===1?"one":""}" style="--n:${days.length}">${head}${allRow}<div class="tg-scroll" id="calScroll"><div class="tg-body" style="height:${24*CAL_H}px"><div class="tg-gut">${hours}${nowLab}</div>${cols}</div></div></div>`;
+}
+function monthGrid(){
+  const D=S.calData?.days||{}, a=dP(S.calA), [g]=calRange(), today=(S.calData?.now||"").slice(0,10);
+  const last=new Date(a.getFullYear(),a.getMonth()+1,0), weeks=Math.ceil((Math.round((dAdd(last,1)-g)/864e5))/7);
+  const names=[...Array(7)].map((_,i)=>dAdd(g,i).toLocaleDateString(undefined,{weekday:"short"}));
+  const cells=[...Array(weeks*7)].map((_,i)=>{ const d=dAdd(g,i), k=dS(d), l=D[k]||[], out=d.getMonth()!==a.getMonth(), max=3, show=l.length>max?max-1:max;
+    return `<div class="mo-cell ${out?"out":""} ${k===today?"is-today":""}" data-calday-go="${k}"><div class="mo-num"><b>${d.getDate()===1?d.toLocaleDateString(undefined,{month:"short"})+" ":""}${d.getDate()}</b></div>
+      ${l.slice(0,show).map(o=>o.all_day?`<div class="pill" style="--c:${evColor(o)}" data-ev="${esc(o.uid)}|${esc(o.start)}">${esc(o.title)}</div>`:`<div class="mo-ev" style="--c:${evColor(o)}" data-ev="${esc(o.uid)}|${esc(o.start)}"><i></i><span>${esc(o.title)}</span><em>${o.start.slice(11)}</em></div>`).join("")}
+      ${l.length>show?`<div class="mo-more">${l.length-show} more</div>`:""}</div>`; }).join("");
+  return `<div class="mo" style="--rows:${weeks}"><div class="mo-head">${names.map(n=>`<div>${n}</div>`).join("")}</div><div class="mo-grid">${cells}</div></div>`;
+}
+function listView(){
+  const D=S.calData?.days||{}, [a]=calRange(), now=S.calData?.now||"";
+  const out=[...Array(31)].map((_,i)=>{ const d=dAdd(a,i), k=dS(d), l=(D[k]||[]).filter(o=>o.all_day||o.end>now); if(!l.length) return "";
+    return `<div class="li-day"><div class="li-date ${k===now.slice(0,10)?"is-today":""}"><b>${d.getDate()}</b><span>${d.toLocaleDateString(undefined,{weekday:"long"})}<small>${d.toLocaleDateString(undefined,{month:"long"})}</small></span></div>
+      <div class="li-evs">${l.map(o=>`<div class="li-ev" style="--c:${evColor(o)}" data-ev="${esc(o.uid)}|${esc(o.start)}"><i></i><div class="li-t mono">${o.all_day?"all-day":o.start.slice(11)+"<br><span>"+o.end.slice(11)+"</span>"}</div><div style="min-width:0;flex:1"><b>${esc(o.title)}</b>${o.location?`<div class="muted">${esc(o.location)}</div>`:""}</div>${o.join&&!o.all_day?`<a class="btn sm" href="${esc(o.join)}" target="_blank" rel="noopener noreferrer">Join</a>`:""}</div>`).join("")}</div></div>`; }).join("");
+  return `<div class="li">${out||'<div class="empty">Nothing in the next 30 days.</div>'}</div>`;
+}
+function findEv(key){
+  const i=key.indexOf("|"), uid=key.slice(0,i), start=key.slice(i+1);
+  for(const P of [S.calData?.days,S.today?.calendar?.days]) for(const l of Object.values(P||{})) for(const o of l) if(o.uid===uid&&o.start===start) return o;
+  return null;
+}
+function evSheet(){
+  const o=S.calEvt; if(!o) return "";
+  const a=dP(o.start), same=o.end.slice(0,10)===o.start.slice(0,10), day=a.toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"});
+  const when=o.all_day?day+" · all-day":`${day}<br>${o.start.slice(11)} – ${same?o.end.slice(11):dP(o.end).toLocaleDateString(undefined,{day:"numeric",month:"short"})+" "+o.end.slice(11)}`;
+  return `<div class="evscrim" data-evclose></div><div class="evsheet" role="dialog" aria-label="${esc(o.title)}" style="--c:${evColor(o)}">
+    <button class="x2 evx" data-evclose aria-label="Close">×</button>
+    <div class="evbar"></div><h2>${esc(o.title)}</h2><div class="evwhen">${when}</div>
+    ${o.location?`<div class="evrow"><span>📍</span><div>${esc(o.location)}</div></div>`:""}
+    ${o.organizer?`<div class="evrow"><span>👤</span><div>${esc(o.organizer)}${o.attendees>1?` · ${o.attendees} people`:""}</div></div>`:o.attendees>1?`<div class="evrow"><span>👥</span><div>${o.attendees} people</div></div>`:""}
+    ${o.notes?`<div class="evnotes">${esc(o.notes)}</div>`:""}
+    <div class="evact"><button class="btn" data-evtodo>Add a prep to-do</button>${o.join?`<a class="btn primary" href="${esc(o.join)}" target="_blank" rel="noopener noreferrer">Join meeting</a>`:""}</div></div>`;
+}
+function viewCalendar(){
+  if(!S.calA) S.calA=dS(new Date());
+  const m=S.calMode, seg=[["day","Day"],["week","Week"],["month","Month"],["list","List"]].map(([k,l])=>`<button class="${m===k?"on":""}" data-calmode="${k}" title="${l} (${k[0].toUpperCase()})">${l}</button>`).join("");
+  const srcs=S.calData?.sources||[];
+  const body=!S.calData?'<div class="empty">Loading…</div>':!srcs.length?`<div class="empty">No calendar yet. Export your calendar as an .ics file and add it under <b>Today → Settings → Calendars</b>, or drop it into your inbox folder.</div>`
+    :m==="day"?timeGrid([dP(S.calA)]):m==="week"?timeGrid([...Array(7)].map((_,i)=>dAdd(calRange()[0],i))):m==="month"?monthGrid():listView();
+  return `<div class="calbar"><h1 class="caltitle">${calTitle()}</h1><div class="seg" role="tablist">${seg}</div>
+    <div class="calnav"><button class="btn sm" data-calnav="0" title="Today (T)">Today</button><button class="ibtn" data-calnav="-1" aria-label="Previous" title="Previous (←)">‹</button><button class="ibtn" data-calnav="1" aria-label="Next" title="Next (→)">›</button></div></div>
+    ${srcs.length>1?`<div class="calsrc">${srcs.map((c,i)=>`<span><i style="background:${CALC[i%CALC.length]}"></i>${esc(c.name||c.path)}</span>`).join("")}</div>`:""}
+    ${body}${evSheet()}`;
+}
+async function calNav(dir){
+  const a=dP(S.calA), m=S.calMode;
+  S.calA=dir===0?dS(new Date()):dS(m==="month"?new Date(a.getFullYear(),a.getMonth()+dir,1):dAdd(a,dir*(m==="day"?1:m==="week"?7:30)));
+  S.calScrollInit=true; await loadCal(); delete S.hashes.main; render();
+}
+async function calMode(m){ S.calMode=m; lsSet("mc.calmode",m); S.calScrollInit=true; await loadCal(); delete S.hashes.main; render(); }
+function viewToday(){
+  const T=S.today; if(!T) return head("Today","Loading…");
+  const now=T.now, day=now.slice(0,10), hr=+now.slice(11,13);
+  const hello=hr<12?"Good morning":hr<18?"Good afternoon":"Good evening";
+  const open=T.items.filter(i=>!i.done), todos=open.filter(i=>!i.remind_at), rem=open.filter(i=>i.remind_at).sort((a,b)=>a.remind_at.localeCompare(b.remind_at));
+  const done=T.items.map((it,n)=>[it,n]).filter(([i])=>i.done).sort((a,b)=>(b[0].done_at||"").localeCompare(a[0].done_at||"")||b[1]-a[1]).map(([i])=>i).slice(0,200);
+  const groups=[["Overdue",todos.filter(i=>i.due&&i.due<day),"late"],["Today",todos.filter(i=>i.due===day)],["Coming up",todos.filter(i=>i.due&&i.due>day).sort((a,b)=>a.due.localeCompare(b.due))],["Anytime",todos.filter(i=>!i.due)]];
+  const needs=S.projects.filter(p=>p.needs_you||p.phase==="awaiting_approval");
+  const sugN=T.suggestions.reduce((a,s)=>a+s.items.filter(i=>i.state==="new").length,0);
+  const mtgs=((T.calendar?.days||{})[day]||[]).filter(o=>!o.all_day&&o.end>now).length;
+  const sub=`${new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})}${mtgs?` · ${mtgs} meeting${mtgs===1?"":"s"} left`:""} · ${todos.length} to-do${todos.length===1?"":"s"}${rem.length?` · ${rem.length} reminder${rem.length===1?"":"s"}`:""}${sugN?` · ${sugN} suggested from your inbox`:""}`;
+  const needsP=needs.length?`<div class="panel tpanel qcard urgent"><h3>Waiting on you</h3>${needs.map(p=>`<div class="needrow" data-proj="${esc(p.path)}"><span>${esc(p.name)}</span><span class="muted" style="font-size:12.5px">${p.phase==="awaiting_approval"?"plan needs approval":p.needs_you+" decision"+(p.needs_you===1?"":"s")} ›</span></div>`).join("")}</div>`:"";
+  const todoP=`<div class="panel tpanel"><h3>To-dos</h3>
+    ${groups.filter(g=>g[1].length).map(([n,l,c])=>`<div class="tgroup ${c||""}">${n}</div>${l.map(itemRow).join("")}`).join("")||`<div class="muted" style="font-size:13px;margin-top:6px">Nothing to do. Add one below, or accept suggestions from your inbox.</div>`}
+    ${done.length?`<div class="tgroup">Done · ${done.length}${done.length>3?" · scroll for more":""}</div><div class="tdone">${done.map(itemRow).join("")}</div>`:""}
+    <div class="tadd"><input class="inp" id="t-new" data-draft="t-new" placeholder="Add a to-do" value="${esc(S.drafts["t-new"]||"")}">
+      ${projSelect('id="t-proj" data-draft="t-proj"',S.drafts["t-proj"]||"")}<input class="inp" type="date" id="t-due" data-draft="t-due" value="${esc(S.drafts["t-due"]||"")}" aria-label="Due date">
+      <button class="btn sm primary" data-tact="add">Add</button></div></div>`;
+  const remP=`<div class="panel tpanel"><h3>Reminders</h3><p class="muted" style="font-size:12.5px;margin:0 0 6px">Each one pings your notification channels once, at its time.</p>
+    ${rem.map(itemRow).join("")||`<div class="muted" style="font-size:13px">No reminders.</div>`}
+    <div class="tadd"><input class="inp" id="r-new" data-draft="r-new" placeholder="Remind me to…" value="${esc(S.drafts["r-new"]||"")}">
+      <input class="inp" type="datetime-local" id="r-at" data-draft="r-at" value="${esc(S.drafts["r-at"]||"")}" aria-label="When">
+      <button class="btn sm primary" data-tact="remind">Add</button></div></div>`;
+  const cfg=T.config;
+  const inboxHead=!cfg.inbox?`<div class="qcard urgent panel" style="margin:10px 0 0;padding:14px"><b>Set up your inbox folder</b><div class="muted" style="font-size:12.5px;margin-top:4px">Copy emails and meeting notes into Markdown files in one folder. Mission Control reads them, sorts them by project and suggests to-dos and reminders. Set the folder in <b>Settings</b> below.</div></div>`
+    :!cfg.inbox_ok?`<div class="muted" style="color:var(--red);font-size:13px">The inbox folder ${esc(cfg.inbox)} doesn't exist any more. Change it in Settings.</div>`
+    :`<div class="muted" style="font-size:12.5px;display:flex;justify-content:space-between;gap:8px;align-items:center"><span>${T.busy?"Reading your inbox…":T.pending_files.length?`${T.pending_files.length} file${T.pending_files.length===1?"":"s"} waiting`:"Inbox is empty"}${T.cost_today?` · ${money(T.cost_today)} today`:""}</span>
+       <span style="display:flex;gap:6px"><button class="btn sm" data-tact="reveal">Open folder</button><button class="btn sm primary" data-tact="process" ${T.busy||!T.pending_files.length?"disabled":""}>Process now</button></span></div>`;
+  const errs=T.errors.length?`<div style="font-size:12px;color:var(--red);margin-top:8px">${T.errors.map(e=>`${esc(e.file)}: ${esc(e.error)}`).join("<br>")}</div>`:"";
+  const sugs=T.suggestions.slice().reverse().map(sg=>{ const e=sg.email, live=sg.items.map((it,i)=>[it,i]).filter(([it])=>it.state==="new");
+    return `<div class="scard"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="min-width:0"><div class="subj">${esc(e.subject||e.file)}</div>
+      <div class="why">${esc(e.from||"")}${e.date?" · "+esc(e.date):""}</div></div><span class="conf ${esc(sg.confidence)}">${esc(sg.confidence)}</span></div>
+      ${e.summary?`<div style="font-size:13px;margin-top:8px">${esc(e.summary)}</div>`:""}
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">${projSelect(`data-tmove="${esc(sg.id)}" aria-label="Project"`,sg.project||"")}<span class="why" style="flex:1;min-width:140px">${esc(sg.reason)}</span></div>
+      ${live.map(([it,i])=>`<div class="sitem"><span title="${it.kind}">${it.kind==="reminder"?"⏰":"☐"}</span><span class="tx">${esc(it.text)}${it.due||it.remind_at?` <span class="muted" style="font-size:12px">· ${dfmt(it.remind_at||it.due)}</span>`:""}</span>
+        <button class="ibtn ok" data-tact="acc" data-id="${esc(sg.id)}" data-i="${i}" aria-label="Accept" title="Add to my list">✓</button><button class="ibtn" data-tact="dis" data-id="${esc(sg.id)}" data-i="${i}" aria-label="Dismiss" title="Dismiss">×</button></div>`).join("")||`<div class="why" style="margin-top:6px">Nothing for you to do in this one.</div>`}
+      <details style="margin-top:6px"><summary class="muted" style="font-size:12px;cursor:pointer">Show email</summary><pre class="mono" style="white-space:pre-wrap;font-size:11.5px;max-height:240px;overflow:auto">${esc(e.excerpt)}</pre></details>
+      <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px">${live.length?`<button class="btn sm primary" data-tact="accall" data-id="${esc(sg.id)}">Accept all</button>`:""}<button class="btn sm" data-tact="disall" data-id="${esc(sg.id)}">${live.length?"Dismiss":"Done"}</button></div></div>`; }).join("");
+  const inboxP=`<div class="panel tpanel"><h3>From your inbox</h3>${inboxHead}${errs}${sugs}</div>`;
+  const notesP=`<div class="panel tpanel"><h3>Notes</h3><textarea class="tnotes" id="t-notes" data-tnotes data-draft="t-notes" placeholder="Anything for today. Saved when you click away.">${esc(S.drafts["t-notes"]??T.notes)}</textarea></div>`;
+  const rd=cfg.reader, rv=rd.type==="claude"?"claude:"+rd.model:rd.type;
+  const setP=`<details class="panel tpanel" ${!cfg.inbox?"open":""}><summary style="cursor:pointer"><h3 style="display:inline">Settings</h3></summary>
+    <div class="label" style="margin-top:12px">Inbox folder</div>
+    <div class="tadd" style="margin-top:6px"><input class="inp mono" id="t-inbox" data-draft="t-inbox" placeholder="~/Documents/Inbox" value="${esc(S.drafts["t-inbox"]??cfg.inbox)}"><button class="btn sm primary" data-tact="inbox">Save</button></div>
+    <label class="lrow" style="cursor:pointer"><span style="font-size:13px">Check the folder every minute</span><input type="checkbox" data-tauto ${cfg.auto?"checked":""}></label>
+    <div class="lrow"><div><div style="font-size:13px">Who reads the emails</div><div class="muted" style="font-size:12px">The email text is sent to this model. A local command keeps it on this computer.</div></div>
+      <select class="sel" data-treader>${[["claude:haiku","Claude Haiku (cheapest)"],["claude:sonnet","Claude Sonnet"],["command","Local command"],["simulator","Simulator (free demo)"]].map(([v,l])=>`<option value="${v}" ${v===rv?"selected":""}>${l}</option>`).join("")}</select></div>
+    ${rd.type==="command"?`<div class="tadd"><input class="inp mono" id="t-cmd" data-draft="t-cmd" placeholder='["ollama","run","qwen2.5","--format","json"]' value="${esc(S.drafts["t-cmd"]??JSON.stringify(rd.cmd||[]))}"><button class="btn sm" data-tact="cmd">Save</button></div>`:""}
+    <div class="label" style="margin-top:14px">Calendars</div>
+    <p class="muted" style="font-size:12px;margin:4px 0 0">Exported .ics files, read on this computer only. To refresh, export again: a new export dropped in the inbox folder replaces the old one with the same name.</p>
+    ${(T.calendar?.sources||[]).map(c=>`<div class="lrow"><div style="min-width:0"><div class="mono" style="font-size:12px;overflow-wrap:anywhere">${esc(c.path)}</div><div class="muted" style="font-size:11.5px">${c.ok?`${c.events} events · updated ${dfmt(c.updated)}`:`<span style="color:var(--red)">${esc(c.error)}</span>`}</div></div><button class="x2" data-tact="${c.dropped?"rmdropped":"rmcal"}" data-id="${esc(c.path)}" aria-label="Remove calendar">×</button></div>`).join("")}
+    <div class="tadd" style="margin-top:6px"><input class="inp mono" id="t-cal" data-draft="t-cal" placeholder="~/Downloads/Calendar.ics" value="${esc(S.drafts["t-cal"]||"")}"><button class="btn sm" data-tact="addcal">Add</button></div>
+    <div class="lrow"><div><div style="font-size:13px">Ping me before meetings</div><div class="muted" style="font-size:12px">Through your notification channels.</div></div>
+      <select class="sel" data-tmeet>${[[0,"Off"],[5,"5 min before"],[10,"10 min before"],[15,"15 min before"],[30,"30 min before"]].map(([v,l])=>`<option value="${v}" ${+cfg.meeting_reminder===v?"selected":""}>${l}</option>`).join("")}</select></div>
+    <div class="label" style="margin-top:14px">How to recognise each project</div>
+    <p class="muted" style="font-size:12px;margin:4px 0 0">Client names, colleagues, codenames. The reader matches emails against these and each project's goal.</p>
+    ${T.projects.map(p=>`<div class="lrow"><span style="font-size:13px;flex:none;max-width:40%">${esc(p.name)}</span><input class="inp" data-tprof="${esc(p.path)}" placeholder="e.g. Acme, Sara, Stripe" value="${esc((cfg.profiles[p.path]||{}).aliases||"")}"></div>`).join("")||`<div class="muted" style="font-size:12.5px">Add a project first.</div>`}
+    ${cfg.rules.length?`<div class="label" style="margin-top:14px">Learned rules</div>${cfg.rules.map((r,i)=>`<div class="lrow"><span style="font-size:13px">${esc(r.from)} → ${esc(r.name)}</span><button class="x2" data-tact="rmrule" data-i="${i}" aria-label="Remove rule">×</button></div>`).join("")}`:""}</details>`;
+  return head(hello, sub) + `<div class="today"><div>${needsP}${calPanel(T)}${todoP}${remP}</div><div>${inboxP}${notesP}${setP}</div></div>` + evSheet();
+}
+async function todayPost(action, body){ S.today=await post("/api/today/"+action, body); delete S.hashes.main; render(); }
+async function todayAct(el){
+  const a=el.dataset.tact, id=el.dataset.id, i=el.dataset.i!==undefined?+el.dataset.i:null;
+  if(a==="add"){ const t=(S.drafts["t-new"]||"").trim(); if(!t) return toast("Write the to-do first",true);
+    await todayPost("add",{text:t,project:S.drafts["t-proj"]||null,due:S.drafts["t-due"]||null}); S.drafts["t-new"]=""; S.drafts["t-due"]=""; delete S.hashes.main; render(); return; }
+  if(a==="remind"){ const t=(S.drafts["r-new"]||"").trim(), at=S.drafts["r-at"]||""; if(!t||!at) return toast("Write the reminder and pick a time",true);
+    await todayPost("add",{text:t,remind_at:at}); S.drafts["r-new"]=""; S.drafts["r-at"]=""; delete S.hashes.main; render(); return; }
+  if(a==="del") return todayPost("item",{id,patch:{delete:true}});
+  if(a==="acc") return todayPost("suggestion",{id,action:"accept",item:i});
+  if(a==="dis") return todayPost("suggestion",{id,action:"dismiss",item:i});
+  if(a==="accall"){ await todayPost("suggestion",{id,action:"accept_all"}); return toast("Added to your list"); }
+  if(a==="disall") return todayPost("suggestion",{id,action:"dismiss_all"});
+  if(a==="process"){ await todayPost("process",{}); toast("Reading your inbox…"); return; }
+  if(a==="reveal") return post("/api/today/reveal",{});
+  if(a==="inbox"){ await todayPost("config",{config:{inbox:S.drafts["t-inbox"]??S.today.config.inbox}}); delete S.drafts["t-inbox"]; toast("Inbox folder saved"); return; }
+  if(a==="cmd"){ let c; try{ c=JSON.parse(S.drafts["t-cmd"]||"[]"); }catch(e){ return toast('Write it as a JSON list, e.g. ["ollama","run","qwen2.5"]',true); }
+    await todayPost("config",{config:{reader:{cmd:c}}}); toast("Saved"); return; }
+  if(a==="rmrule") return todayPost("config",{config:{remove_rule:i}});
+  if(a==="addcal"){ const v=(S.drafts["t-cal"]||"").trim(); if(!v) return toast("Paste the path of an .ics file",true);
+    await todayPost("config",{config:{add_calendar:v}}); S.drafts["t-cal"]=""; toast("Calendar added"); return; }
+  if(a==="rmcal") return todayPost("config",{config:{remove_calendar:id}});
+  if(a==="rmdropped") return todayPost("config",{config:{remove_dropped:id}});
+}
 function limitsPanel(){
   const mi=S.st.mission, sup=S.st.supervisor||{};
   const sel=(id,label,hint,cur,opts,fmtOpt)=>{ const all=[...new Set([...opts,cur].filter(x=>x!==undefined&&x!==null))].sort((a,b)=>(a===0?-1:b===0?1:a-b));
@@ -843,41 +1316,98 @@ function limitsPanel(){
     ${sel("lim-calls","Model calls per executor run","A run is stopped after this many steps.",mi.executor_max_turns||0,[0,10,20,30,50,80,120],v=>v?v+" calls":"No cap")}
     ${sup.mode==="dashboard"?sel("lim-sup","Supervisor turns without you","It pauses after this many turns in a row.",sup.max_auto_turns||40,[10,20,40,80,160],v=>v+" turns"):""}</div>`;
 }
+// the done list shows its three newest rows; the rest scroll
+function capDone(){ document.querySelectorAll(".tdone").forEach(b=>{ b.style.maxHeight=""; if(b.children.length>3) b.style.maxHeight=[...b.children].slice(0,3).reduce((h,x)=>h+x.offsetHeight,0)+"px"; }); }
+window.addEventListener("resize", capDone);
+function updateJump(){ const c=$("chatlog"), j=$("jumpChat"); if(!c||!j) return; j.classList.toggle("on", c.scrollTop+c.clientHeight < c.scrollHeight-120); }
+function growBox(t){ t.style.height="auto"; t.style.height=Math.min(180,t.scrollHeight)+"px"; }
+document.addEventListener("scroll", e=>{ if(e.target.id==="chatlog") updateJump(); }, true);
+function chatMsgs(st, dash){
+  let prev=null, out="";
+  st.chat.forEach(c=>{
+    const day=(c.ts||"").slice(0,10);
+    if(!prev || day!==(prev.ts||"").slice(0,10)) out+=`<div class="dayline"><span>${new Date(c.ts).toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"short"})}</span></div>`;
+    if(c.role==="system"){ out+=`<div class="msg sys">${esc(c.text)}</div>`; prev=c; return; }
+    const me=c.role==="user", cont=prev&&prev.role===c.role&&(ts(c.ts)-ts(prev.ts))<5*60000&&day===(prev.ts||"").slice(0,10);
+    out+=`<div class="msg ${me?"me":"sup"} ${cont?"cont":""}">${cont?"":`<div class="who">${me?"You":"Supervisor"} <span>${clock(c.ts)}${!me&&c.cost?` · ${money(c.cost)}`:""}${me&&!c.delivered&&dash?" · queued":""}</span></div>`}<div class="${me?"":"md-lite"}">${me?esc(c.text).replace(/\n/g,"<br>"):md(c.text)}</div></div>`;
+    prev=c;
+  });
+  return out;
+}
+function decisionCard(q){
+  return q.permission?permCard(q):`<div class="panel qcard urgent">
+    <div class="mono muted" style="font-size:11px">${q.id}${q.task?" · "+q.task:""} · ${ago(q.created)} ago</div><h4>${esc(q.question)}</h4>
+    ${q.options?.length?`<div class="opts">${q.options.map(o=>`<button class="opt ${o===q.recommendation?"rec":""}" data-answer="${esc(q.id)}" data-val="${esc(o)}">${esc(o)}</button>`).join("")}</div>`:""}
+    <textarea id="ans-${esc(q.id)}" data-draft="ans-${esc(q.id)}" placeholder="Or write your own answer…">${esc(S.drafts["ans-"+q.id]||"")}</textarea>
+    <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn primary sm" data-answer-text="${esc(q.id)}">Send answer</button></div></div>`;
+}
 function viewComms(){
   const st=S.st; if(!st) return head("Chat","")+noMission();
   const sp=st.supervisor||{}, dash=sp.mode==="dashboard", Q=st.questions;
   const mine=Q.filter(q=>q.to==="user"&&q.status==="open"), chain=Q.filter(q=>q.to==="supervisor").reverse();
-  const msgs=st.chat.map(c=>{
-    if(c.role==="system") return `<div class="msg sys">${esc(c.text)}</div>`;
-    const me=c.role==="user";
-    return `<div class="msg ${me?"me":"sup"}"><div class="who">${me?"You":"Supervisor"} <span>${clock(c.ts)}${!me&&c.cost?` · ${money(c.cost)}`:""}${me&&!c.delivered&&dash?" · queued":""}</span></div><div class="${me?"":"md-lite"}">${me?esc(c.text).replace(/\n/g,"<br>"):md(c.text)}</div></div>`;
-  }).join("");
   const typing = sp.running ? `<div class="msg sup typing"><div class="who">Supervisor <span>${esc(sp.step||"thinking")}</span></div><div class="dots"><i></i><i></i><i></i></div></div>` : "";
-  const intro = !st.chat.length ? `<div class="msg sys">${dash?"Your supervisor will appear here. Tell it what you want to build.":"This mission's supervisor runs in an external chat (e.g. Claude Code). Messages you send here are delivered to it as notes."}</div>` : "";
-  return head("Chat", dash?`Talk to your supervisor (${esc(supLabel())}). It plans, delegates and reviews. Executors never talk to you.`:"Supervisor runs in an external chat. Messages here are delivered as notes.",
-      `<div class="gstats">${dash?`${S.st.resume_cmd?`<button class="btn sm" id="ccCopy" title="Copies a command that opens this supervisor chat in Claude Code. Run it in a terminal.">Open in Claude Code</button>`:""}<button class="btn sm" id="supReset" title="Start a fresh supervisor session from the mission state (saves tokens)">↻ Fresh session</button>`:`<button class="btn sm" id="supTake" title="Let the dashboard run the supervisor">Run supervisor here</button>`}</div>`)
-   + approveBanner() + prBanner()
-   + `<div class="comms"><div class="panel chat"><div class="chat-log" id="chatlog">${intro}${msgs}${typing}</div>
-        <div class="composer"><textarea id="chat-box" data-draft="chat" placeholder="${st.mission.phase==="briefing"?"Describe what you want to build, who it's for, and what done looks like…":"Message your supervisor"}">${esc(S.drafts.chat||"")}</textarea>
-        <button class="btn primary" id="sendChat">Send ➤</button></div></div>
-      <div>
-      ${mine.length?`<div class="label" style="margin-bottom:10px">Decisions waiting on you <span style="color:var(--magenta)">· ${mine.length}</span></div>`:""}
-      ${mine.map(q=>q.permission?permCard(q):`<div class="panel qcard urgent">
-        <div class="mono muted" style="font-size:11px">${q.id}${q.task?" · "+q.task:""} · ${ago(q.created)} ago</div><h4>${esc(q.question)}</h4>
-        ${q.options?.length?`<div class="opts">${q.options.map(o=>`<button class="opt ${o===q.recommendation?"rec":""}" data-answer="${esc(q.id)}" data-val="${esc(o)}">${esc(o)}</button>`).join("")}</div>`:""}
-        <textarea id="ans-${esc(q.id)}" data-draft="ans-${esc(q.id)}" placeholder="Or write your own answer…">${esc(S.drafts["ans-"+q.id]||"")}</textarea>
-        <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn primary sm" data-answer-text="${esc(q.id)}">Send answer</button></div></div>`).join("")}
-            ${watchPanel()}
-      ${permPanel()}
-      ${limitsPanel()}
-      <div class="panel qcard"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div class="label">Models and effort</div><button class="btn sm primary" id="saveModels">Save</button></div>
-        <p class="muted" style="font-size:12.5px;margin:0 0 12px"><b>Effort</b> is how hard the model thinks before answering. Higher is more thorough on hard problems but slower and costlier. Lower is fine for routine tasks.</p>
-        ${modelPicker("md-", st.runners, {sr:sp.runner||"claude-supervisor", sm:sp.model||"", se:sp.effort||"", er:st.mission.default_executor||"claude", em:st.mission.executor_model||"", ee:st.mission.executor_effort||""})}</div>
-<div class="label" style="margin-bottom:10px">Executor questions</div>
-      <div class="panel qscroll" id="qscroll">${chain.map(q=>`<div class="thread" data-task="${esc(q.task||"")}" style="cursor:pointer"><div class="mono muted" style="font-size:11px">${q.id} · ${ago(q.created)} ago · ${q.status==="open"?'<span style="color:var(--magenta)">waiting for supervisor</span>':'<span style="color:var(--lime)">answered</span>'}</div>
+  const intro = !st.chat.length ? `<div class="chat-empty"><div class="big">👋</div><b>${dash?"Say hello to your supervisor":"Supervisor runs in an external chat"}</b><div class="muted">${dash?"Tell it what you want to build, who it's for and what done looks like. It plans the work, hands tasks to cheaper models and reviews them.":"This mission's supervisor runs in another chat (e.g. Claude Code). Messages you send here reach it as notes."}</div></div>` : "";
+  const side = `${mine.length?`<div class="label" style="margin-bottom:10px">Decisions waiting on you <span style="color:var(--magenta)">· ${mine.length}</span></div>${mine.map(decisionCard).join("")}`:""}
+      ${watchPanel()}
+      ${chain.length?`<div class="label" style="margin:4px 0 10px">Executor questions</div>
+      <div class="panel qscroll" id="qscroll">${chain.map(q=>`<div class="thread" data-task="${esc(q.task||"")}" style="cursor:pointer"><div class="mono muted" style="font-size:11px">${q.id} · ${ago(q.created)} ago · ${q.status==="open"?'<span style="color:var(--magenta)">waiting for supervisor</span>':'<span style="color:var(--green)">answered</span>'}</div>
         <div class="bubble q"><small>${esc(q.from)} (executor)</small>${esc(q.question)}</div>
-        ${q.status==="answered"?`<div class="bubble a"><small>${esc(q.answered_by==="user"?"You":"Supervisor")}</small>${esc(q.answer)}</div>`:""}</div>`).join("")||'<div class="thread muted">No executor questions yet.</div>'}</div>
-      </div></div>`;
+        ${q.status==="answered"?`<div class="bubble a"><small>${esc(q.answered_by==="user"?"You":"Supervisor")}</small>${esc(q.answer)}</div>`:""}</div>`).join("")}</div>`:""}`;
+  const hasSide = side.trim().length>0;
+  return head("Chat", dash?`Your supervisor (${esc(supLabel())}) plans, delegates and reviews. Executors never talk to you.`:"Supervisor runs in an external chat. Messages here are delivered as notes.",
+      `<div class="gstats">${dash?`${S.st.resume_cmd?`<button class="btn sm" id="ccCopy" title="Copies a command that opens this supervisor chat in Claude Code. Run it in a terminal.">Open in Claude Code</button>`:""}<button class="btn sm" id="supReset" title="Start a fresh supervisor session from the mission state (saves tokens)">↻ Fresh session</button>`:`<button class="btn sm" id="supTake" title="Let the dashboard run the supervisor">Run supervisor here</button>`}<button class="btn sm" data-view="settings" title="Access, snapshots, limits, models, notifications">⚙︎ Settings</button></div>`)
+   + approveBanner() + prBanner()
+   + `<div class="comms ${hasSide?"":"solo"}"><div class="panel chat"><div class="chat-log" id="chatlog">${intro}${chatMsgs(st,dash)}${typing}</div>
+        <button class="jump" id="jumpChat" type="button" aria-label="Jump to the latest message">↓ Latest</button>
+        <div class="composer"><textarea id="chat-box" data-draft="chat" rows="1" placeholder="${st.mission.phase==="briefing"?"Describe what you want to build, who it's for, and what done looks like…":"Message your supervisor"}">${esc(S.drafts.chat||"")}</textarea>
+        <button class="btn primary" id="sendChat" aria-label="Send">Send ➤</button></div>
+        <div class="composer-hint">Enter to send · Shift+Enter for a new line</div></div>
+      ${hasSide?`<div class="side">${side}</div>`:""}</div>`;
+}
+/* ── settings (per project, plus global notifications) ── */
+function accessPanel(){
+  const a=S.st.access||{}, allow=S.st.mission.permissions?.allow||[], sb=a.mode==="sandbox";
+  const bashRules=allow.filter(r=>r.startsWith("Bash(")), other=allow.filter(r=>!r.startsWith("Bash(")&&!r.startsWith("Domain("));
+  const opt=(v,t,d)=>`<label class="mode ${(a.chosen||"sandbox")===v?"on":""}"><input type="radio" name="acc" data-access="${v}" ${(a.chosen||"sandbox")===v?"checked":""} ${v==="sandbox"&&!a.supported?"disabled":""}><div><b>${t}</b><div class="muted" style="font-size:12.5px;margin-top:2px">${d}</div></div></label>`;
+  return `<div class="panel qcard"><div class="label">What agents can do</div>
+    ${opt("sandbox","Full access inside the project (recommended)","The supervisor and executors run any command without asking. The operating system keeps them inside this project folder: they can't write anywhere else, can't read your keys (SSH, cloud, GitHub logins) and only reach the internet sites listed below. Snapshots let you undo anything.")}
+    ${opt("allowlist","Only allowed commands","The older mode: each kind of command must be allowed one by one, and agents stop to ask when something isn't on the list.")}
+    ${!a.supported?`<div class="muted" style="font-size:12.5px;color:var(--orange)">The sandbox isn't available on this system (it needs macOS, or Linux with bubblewrap and socat), so agents use allowed commands.</div>`:""}
+    ${sb?`<div class="label" style="margin-top:14px">Internet sites agents can reach</div>
+      <div class="rules">${(a.domains||[]).map(d=>`<span class="rule"><code>${esc(d)}</code><button class="x2" data-rmdom="${esc(d)}" aria-label="Remove ${esc(d)}">×</button></span>`).join("")||'<span class="muted" style="font-size:12.5px">None: agents are offline.</span>'}</div>
+      <div style="display:flex;gap:8px;margin-top:8px"><input class="inp" id="domIn" data-draft="domIn" placeholder="example.com  or  *.example.com" value="${esc(S.drafts.domIn||"")}"><button class="btn sm primary" id="addDom">Add</button><button class="btn sm" id="resetDom" title="Back to: ${esc((a.default_domains||[]).join(", "))}">Defaults</button></div>`:""}
+    ${other.length||!sb?`<div class="label" style="margin-top:14px">${sb?"Extra tools":"Allowed commands"}</div>
+      <div class="rules">${(sb?other:allow).map(r=>`<span class="rule"><code>${esc(r)}</code><button class="x2" data-rmperm="${esc(r)}" aria-label="Remove ${esc(r)}">×</button></span>`).join("")||'<span class="muted" style="font-size:12.5px">Only the defaults.</span>'}</div>`:""}
+    <div style="display:flex;gap:8px;margin-top:8px"><input class="inp" id="permRule" data-draft="permRule" placeholder="${sb?"WebSearch  or  WebFetch":"Bash(~/venvs/env/bin/python *)  or  WebSearch"}" value="${esc(S.drafts.permRule||"")}"><button class="btn sm" id="addPerm">Allow</button></div>
+    ${sb&&bashRules.length?`<div class="muted" style="font-size:12.5px;margin-top:12px;display:flex;justify-content:space-between;gap:10px;align-items:center"><span>${bashRules.length} command rule${bashRules.length===1?"":"s"} from the old mode aren't needed any more.</span><button class="btn sm" id="clearBash">Clear them</button></div>`:""}</div>`;
+}
+function snapPanel(){
+  const sn=S.snaps; if(!sn) return `<div class="panel qcard"><div class="label">Snapshots</div><div class="muted" style="font-size:12.5px">Loading…</div></div>`;
+  if(!sn.available) return `<div class="panel qcard"><div class="label">Snapshots</div><div class="muted" style="font-size:12.5px">Snapshots need git, which isn't installed.</div></div>`;
+  const kb=sn.size/1024, size=kb>1024?(kb/1024).toFixed(1)+" MB":Math.max(1,Math.round(kb))+" KB";
+  const byDay={}; sn.list.forEach(x=>(byDay[x.ts.slice(0,10)]=byDay[x.ts.slice(0,10)]||[]).push(x));
+  const row=x=>{ const open=S.snapOpen===x.ref, ch=S.snapChanges?.[x.ref];
+    return `<div class="snap ${open?"open":""}"><div class="snaprow" data-snap="${esc(x.ref)}"><span class="mono" style="font-size:12.5px">${x.ts.slice(11,16)}</span><span class="tx">${esc(x.reason)}</span><span class="muted" style="font-size:12px">${open?"▾":"▸"}</span></div>
+      ${open?`<div class="snapbody">${!ch?'<div class="muted" style="font-size:12.5px">Comparing with the folder now…</div>':!ch.length?'<div class="muted" style="font-size:12.5px">The folder is the same as this snapshot.</div>':
+        `<div class="muted" style="font-size:12px;margin-bottom:6px">${ch.length===1?"1 file differs":ch.length+" files differ"} from now. M changed · D deleted since · A new since (kept when you restore)</div>
+        ${ch.slice(0,60).map(c=>`<div class="chrow"><span class="st st-${c.status}">${c.status}</span><span class="mono tx">${esc(c.path)}</span>${c.status!=="A"?`<button class="btn sm" data-restore="${esc(x.ref)}" data-path="${esc(c.path)}">Restore</button>`:""}</div>`).join("")}
+        ${ch.length>60?`<div class="muted" style="font-size:12px">…and ${ch.length-60} more</div>`:""}
+        <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn sm primary" data-restore="${esc(x.ref)}">Restore every file from this snapshot</button></div>`}</div>`:""}</div>`; };
+  return `<div class="panel qcard"><div style="display:flex;justify-content:space-between;align-items:center"><div class="label">Snapshots</div><input type="checkbox" data-snapon ${sn.on?"checked":""} aria-label="Snapshots on"></div>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px">A copy of the project is saved before every agent run and every ${sn.every_min} minutes while agents work, and kept ${sn.keep_days} days. Unchanged files are stored once (${size} used). Files over 50 MB, online-only cloud files and folders like node_modules are skipped.</p>
+    ${sn.error?`<div style="font-size:12px;color:var(--red);margin-bottom:8px">Last problem: ${esc(sn.error)}</div>`:""}
+    <div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn sm" id="snapNow" ${sn.busy?"disabled":""}>${sn.busy?"Saving…":"Take a snapshot now"}</button></div>
+    ${sn.list.length?Object.entries(byDay).map(([d,l])=>`<div class="tgroup">${dfmt(d)}</div>${l.map(row).join("")}`).join(""):'<div class="muted" style="font-size:12.5px">No snapshots yet. The first one is taken when an agent starts.</div>'}</div>`;
+}
+function viewSettings(){
+  const st=S.st; if(!st) return head("Settings","")+noMission();
+  const sp=st.supervisor||{};
+  return head("Settings","How agents work on this project. Notifications apply to every project.")+`<div class="settings">
+    <div>${accessPanel()}${limitsPanel()}
+      <div class="panel qcard"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div class="label">Models and effort</div><button class="btn sm primary" id="saveModels">Save</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 12px"><b>Effort</b> is how hard the model thinks before answering. Higher is more thorough on hard problems but slower and costlier.</p>
+        ${modelPicker("md-", st.runners, {sr:sp.runner||"claude-supervisor", sm:sp.model||"", se:sp.effort||"", er:st.mission.default_executor||"claude", em:st.mission.executor_model||"", ee:st.mission.executor_effort||""})}</div></div>
+    <div>${snapPanel()}${notifyPanel()}</div></div>`;
 }
 
 
@@ -1004,10 +1534,10 @@ async function refreshLog(){
 
 /* ───────── events ───────── */
 document.addEventListener("click", async e=>{
-  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
+  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-ms],[data-calday],[data-calmode],[data-calnav],[data-calgo],[data-calday-go],[data-ev],[data-evclose],[data-evtodo],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
   if(!el) return;
   try{
-    if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(S.view!=="overview"){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
+    if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(S.view==="comms") S.chatBottom=true; if(!GLOBAL.has(S.view)){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
     if(el.dataset.ignite){ e.stopPropagation(); el.disabled=true; el.textContent="Igniting…"; const models=$("ig-sr")?readPicker("ig-"):undefined; if(models) lsSet("mc.models",JSON.stringify(models));
       await post("/api/ignite",{p:el.dataset.ignite,models}).catch(()=>{el.disabled=false});
       selectProject(el.dataset.ignite,"comms"); toast("Mission Control ignited. Your supervisor is looking around"); await tick(); return; }
@@ -1028,6 +1558,31 @@ document.addEventListener("click", async e=>{
       if(!confirm(`Remove "${p.name}" from the dashboard?\n\nYour files and the Mission Control data in the project stay exactly where they are. You can add the folder again at any time.${warn}`)) return;
       await post("/api/remove-project",{p:p.path}); if(S.cur===p.path){ S.cur=null; S.view="overview"; lsSet("mc.view","overview"); } S.hashes={}; toast(`Removed "${p.name}". Its files are untouched`); await tick(); return; }
     if(el.id==="sendChat"){ return sendChat(); }
+    if(el.dataset.tact){ await todayAct(el); return; }
+    if(el.dataset.ms){ S.ms=el.dataset.ms; delete S.hashes.main; render(); return; }
+    if(el.dataset.ev){ if(e.target.closest("a[href]")) return; const o=findEv(el.dataset.ev); if(o){ S.calEvt=o; delete S.hashes.main; render(); } return; }
+    if(el.dataset.evclose!==undefined){ S.calEvt=null; delete S.hashes.main; render(); return; }
+    if(el.dataset.evtodo!==undefined){ const o=S.calEvt; await post("/api/today/add",{text:"Prepare for: "+o.title,due:o.start.slice(0,10)}); S.calEvt=null; toast("Added to your to-dos"); delete S.hashes.main; render(); return; }
+    if(el.dataset.calmode) return calMode(el.dataset.calmode);
+    if(el.dataset.calnav!==undefined) return calNav(+el.dataset.calnav);
+    if(el.dataset.calgo||el.dataset.caldayGo){ if(S.calMode==="day"&&el.dataset.calgo) return; S.calA=el.dataset.calgo||el.dataset.caldayGo; return calMode("day"); }
+    if(el.dataset.calday!==undefined){ S.calDay=+el.dataset.calday; delete S.hashes.main; render(); return; }
+    if(el.id==="jumpChat"){ const c=$("chatlog"); c.scrollTo({top:c.scrollHeight,behavior:"smooth"}); return; }
+    if(el.dataset.rmdom!==undefined||el.id==="addDom"||el.id==="resetDom"){ const a=S.st.access; let d=[...(a.domains||[])];
+      if(el.id==="resetDom") d=[...a.default_domains]; else if(el.id==="addDom"){ const v=(S.drafts.domIn||"").trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\/.*$/,""); if(!v) return toast("Type a site, e.g. example.com",true); d.push(v); S.drafts.domIn=""; }
+      else d=d.filter(x=>x!==el.dataset.rmdom);
+      await post("/api/access",{domains:d}); toast("Saved. Applies from the next agent run"); await tick(); return; }
+    if(el.id==="clearBash"){ for(const r of (S.st.mission.permissions?.allow||[]).filter(r=>r.startsWith("Bash("))) await post("/api/permission",{action:"remove",rule:r}); toast("Old command rules cleared"); await tick(); return; }
+    if(el.dataset.snap){ const r=el.dataset.snap; S.snapOpen=S.snapOpen===r?null:r; render();
+      if(S.snapOpen){ S.snapChanges=S.snapChanges||{}; const res=await api(`/api/snapshot-changes?p=${encodeURIComponent(S.cur)}&ref=${encodeURIComponent(r)}`).catch(e=>{toast(e.message,true); return {changes:[]};}); S.snapChanges={...S.snapChanges,[r]:res.changes}; render(); } return; }
+    if(el.dataset.restore){ const path=el.dataset.path, what=path?`“${path}”`:"every file in this snapshot";
+      if(!confirm(`Put back ${what} as it was in the snapshot? Your current version is snapshotted first, so you can undo this.`)) return;
+      const r=await post("/api/snapshot",{action:"restore",ref:el.dataset.restore,paths:path?[path]:null}); toast(`Restored ${r.restored} file${r.restored===1?"":"s"}`); S.snapChanges={}; S.snapOpen=null; await tick(); return; }
+    if(el.id==="snapNow"){ el.disabled=true; el.textContent="Saving…"; const r=await post("/api/snapshot",{action:"take"}).catch(()=>({})); toast(r.taken?"Snapshot saved":"Nothing changed since the last snapshot"); await tick(); return; }
+    if(el.dataset.nsave){ const n=el.dataset.nsave, v=(S.drafts["nf-"+n]||"").trim(); if(!v) return toast("Paste the "+(n==="ntfy"?"topic":"URL")+" first",true);
+      S.notify=await post("/api/notify",{channels:{[n]:{[n==="ntfy"?"topic":"url"]:v,on:true}}}); S.drafts["nf-"+n]=""; delete S.hashes.main; toast("Saved"); render(); return; }
+    if(el.id==="notifyTest"){ const r=await post("/api/notify-test",{}); const bad=Object.entries(r.results).filter(([,v])=>v!=="ok");
+      toast(bad.length?bad.map(([k,v])=>k+": "+v).join(" · "):"Test sent via "+Object.keys(r.results).join(", "),bad.length>0); return; }
     if(el.id==="addPerm"){ const v=($("permRule")?.value||"").trim(); if(!v) return toast("Enter a rule, e.g. WebSearch",true); await post("/api/permission",{action:"add",rule:v}); S.drafts.permRule=""; toast("Allowed for this project"); await tick(); return; }
     if(el.dataset.rmperm){ await post("/api/permission",{action:"remove",rule:el.dataset.rmperm}); toast("Removed"); await tick(); return; }
     if(el.id==="ccCopy"){ try{ await navigator.clipboard.writeText(S.st.resume_cmd); toast("Copied. Paste it in a terminal to continue this chat in Claude Code"); }catch(e){ toast("Couldn't access the clipboard",true); } return; }
@@ -1077,21 +1632,42 @@ function selectProject(path, view){
     S.st=null; S.usage=null; S.usageOpen=new Set(); S.usageCalls={}; S.usageFilter="all"; S.logs={}; S.hashes={}; closeDrawer();
   }
   S.usageScope="project";
-  S.view = view || (S.view==="overview" ? S.lastView : S.view);
-  if(S.view!=="overview"){ S.lastView=S.view; lsSet("mc.lastview",S.view); }
+  S.view = view || (GLOBAL.has(S.view) ? S.lastView : S.view);
+  if(!GLOBAL.has(S.view)){ S.lastView=S.view; lsSet("mc.lastview",S.view); }
   lsSet("mc.view",S.view);
 }
 async function sendChat(){
+  S.chatBottom=true;
   const box=$("chat-box"), v=(box?.value||"").trim(); if(!v) return;
   box.value=""; S.drafts.chat="";
   try{ await post("/api/chat",{text:v}); }catch(err){ box.value=v; S.drafts.chat=v; return; }
   await tick();
 }
-document.addEventListener("keydown", e=>{ if(e.target.id==="permRule" && e.key==="Enter"){ e.preventDefault(); $("addPerm")?.click(); } if(e.target.id==="chat-box" && e.key==="Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); sendChat(); }
-  if(e.target.id==="addPath" && e.key==="Enter"){ e.preventDefault(); $("addBtn")?.click(); } });
-document.addEventListener("input", e=>{ const k=e.target.dataset?.draft; if(k) S.drafts[k]=e.target.value;
+document.addEventListener("keydown", e=>{
+  if(e.key==="Escape"&&S.calEvt){ S.calEvt=null; delete S.hashes.main; render(); return; }
+  if(S.view!=="calendar"||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||e.metaKey||e.ctrlKey||e.altKey) return;
+  if(e.key==="ArrowLeft"||e.key==="ArrowRight"){ e.preventDefault(); calNav(e.key==="ArrowLeft"?-1:1); return; }
+  if(e.key==="t") return calNav(0);
+  const m={d:"day",w:"week",m:"month",l:"list"}[e.key]; if(m) calMode(m);
+});
+document.addEventListener("keydown", e=>{ if(e.target.id==="permRule" && e.key==="Enter"){ e.preventDefault(); $("addPerm")?.click(); } if(e.target.id==="domIn" && e.key==="Enter"){ e.preventDefault(); $("addDom")?.click(); } if(e.target.id==="chat-box" && e.key==="Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); sendChat(); }
+  if(e.target.id==="addPath" && e.key==="Enter"){ e.preventDefault(); $("addBtn")?.click(); }
+  if((e.target.id==="t-new"||e.target.id==="r-new") && e.key==="Enter"){ e.preventDefault(); document.querySelector(`[data-tact="${e.target.id==="t-new"?"add":"remind"}"]`)?.click(); } });
+document.addEventListener("input", e=>{ const k=e.target.dataset?.draft; if(k) S.drafts[k]=e.target.value; if(e.target.id==="chat-box") growBox(e.target);
   if(e.target.id==="addPath"){ const was=S._wasRepo, now=looksRepo(e.target.value); S._wasRepo=now; if(was!==now){ delete S.hashes.main; const pos=e.target.selectionStart; render(); const i=$("addPath"); if(i){ i.focus(); i.setSelectionRange(pos,pos); } } } });
 document.addEventListener("change", async e=>{ const t=e.target;
+  if(t.dataset?.access){ await post("/api/access",{mode:t.dataset.access}).catch(()=>{}); toast(t.dataset.access==="sandbox"?"Full access inside the project, sandboxed":"Only allowed commands"); return tick(); }
+  if(t.dataset?.snapon!==undefined){ await post("/api/snapshot",{action:"toggle",on:t.checked}).catch(()=>{}); return tick(); }
+  if(t.dataset?.tdone) return todayPost("item",{id:t.dataset.tdone,patch:{done:t.checked}}).catch(()=>{});
+  if(t.dataset?.tmove!==undefined){ await todayPost("suggestion",{id:t.dataset.tmove,action:"move",project:t.value||null}).catch(()=>{}); return toast(t.value?"Moved. Emails from this sender will go there from now on":"Moved"); }
+  if(t.dataset?.tmeet!==undefined) return todayPost("config",{config:{meeting_reminder:+t.value}}).then(()=>toast(+t.value?`You'll be pinged ${t.value} min before meetings`:"Meeting pings off")).catch(()=>{});
+  if(t.dataset?.tauto!==undefined) return todayPost("config",{config:{auto:t.checked}}).catch(()=>{});
+  if(t.dataset?.treader!==undefined){ const [ty,md]=t.value.split(":"); return todayPost("config",{config:{reader:{type:ty,...(md?{model:md}:{})}}}).catch(()=>{}); }
+  if(t.dataset?.tprof) return todayPost("config",{config:{profile:{project:t.dataset.tprof,aliases:t.value}}}).then(()=>toast("Saved")).catch(()=>{});
+  if(t.dataset?.tnotes!==undefined){ await todayPost("notes",{text:t.value}).catch(()=>{}); delete S.drafts["t-notes"]; return toast("Notes saved"); }
+  if(t.dataset?.nmaster!==undefined){ S.notify=await post("/api/notify",{enabled:t.checked}).catch(()=>S.notify); delete S.hashes.main; render(); return; }
+  if(t.dataset?.nchan){ S.notify=await post("/api/notify",{channels:{[t.dataset.nchan]:{on:t.checked}}}).catch(e=>{toast(e.message); return S.notify;}); delete S.hashes.main; render(); return; }
+  if(t.dataset?.nkind){ S.notify=await post("/api/notify",{kinds:{[t.dataset.nkind]:t.checked}}).catch(()=>S.notify); delete S.hashes.main; render(); return; }
   if(t.dataset?.limit){ const v=Number(t.value), k=t.dataset.limit, body={"lim-att":{max_attempts:v},"lim-bud":{budget:v},"lim-calls":{max_turns:v},"lim-sup":{sup_turns:v}}[k];
     await post("/api/limits",body).catch(()=>{}); toast("Limit saved"); await tick(); return; }
   if(t.dataset?.pick){ S.drafts[t.dataset.draft]=t.value; const sel=$(t.dataset.pick); if(sel){ S.drafts[t.dataset.pick]=""; S.drafts[t.dataset.pick.slice(0,-1)+"e"]=""; delete S.hashes.main; S.drafts[t.dataset.pick+"-x"]=""; renderPickerNow(t.dataset.pick.slice(0,3)); } }

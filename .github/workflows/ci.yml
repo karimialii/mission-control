@@ -21,7 +21,7 @@ jobs:
           MC="$PY $GITHUB_WORKSPACE/scripts/mc.py"
           mkdir "$RUNNER_TEMP/proj" && cd "$RUNNER_TEMP/proj"
           $MC init --name CI --goal ci --executor simulator
-          $MC add --title demo --executor simulator
+          $MC add --title demo --executor simulator --check true
           $MC add --title long --executor simulator
           $MC run T-001
           for i in $(seq 1 30); do $MC status | grep -q "T-001 .*| done" && break; sleep 1; done
