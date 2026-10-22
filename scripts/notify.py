@@ -28,6 +28,7 @@ KINDS = {
     "failure": "A task or check failed, or something broke",
     "complete": "Every task in a mission is done",
     "watch": "A watched external job finished or failed",
+    "reminder": "A reminder on your Today page is due",
 }
 DEFAULT = {
     "enabled": True,

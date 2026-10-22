@@ -22,6 +22,7 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import compat  # noqa: E402
 import mc  # noqa: E402
+import today  # noqa: E402
 
 if __name__ == "__main__":
     compat.ensure_utf8()
@@ -222,6 +223,10 @@ SYNC_EVERY = 90  # seconds between GitHub checks for human tasks
 def supervisor_loop() -> None:
     """Reaps finished runners, marks crashed ones, syncs human tasks from GitHub, and runs autopilot."""
     while True:
+        try:
+            today.tick()
+        except Exception as e:  # the Today page must never stop the mission loop
+            print(f"[loop] today: {e}", file=sys.stderr)
         with CHILD_LOCK:
             mc.SPAWNED[:] = [p for p in mc.SPAWNED if p.poll() is None]
         for path in project_paths():
@@ -251,6 +256,33 @@ def supervisor_loop() -> None:
             except Exception as e:  # keep the loop alive no matter what
                 print(f"[loop] {path}: {e}", file=sys.stderr)
         time.sleep(2)
+
+
+def today_post(action: str, body: dict) -> dict:
+    """The Today page's writes. ValueError becomes a 400 with its message."""
+    if action == "config":
+        today.set_config(body.get("config") or {})
+    elif action == "add":
+        today.add_item(body.get("text", ""), body.get("project"), body.get("due"), body.get("remind_at"))
+    elif action == "item":
+        today.update_item(str(body.get("id")), body.get("patch") or {})
+    elif action == "suggestion":
+        idx = body.get("item")
+        today.resolve(str(body.get("id")), str(body.get("action")), int(idx) if idx is not None else None,
+                      body.get("edits"), body.get("project"))
+    elif action == "notes":
+        today.notes(str(body.get("text", "")))
+    elif action == "process":
+        threading.Thread(target=today.process_inbox, kwargs={"force": True}, daemon=True).start()
+    elif action == "reveal":
+        d = today.inbox_dir()
+        if not d:
+            raise ValueError("set an inbox folder first")
+        if not compat.reveal(d):
+            raise ValueError(f"can't open folders on this system: {d}")
+    else:
+        raise ValueError("unknown action")
+    return {"ok": True, **today.state()}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -306,6 +338,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"clone_dir": str(default_clone_dir()).replace(str(Path.home()), "~", 1)})
             if u.path == "/api/notify":
                 return self._send(200, mc.notify.masked())
+            if u.path == "/api/today":
+                return self._send(200, today.state())
             if u.path == "/api/projects":
                 return self._send(200, [summary(p, i) for p, i in project_paths().items()])
             if u.path == "/api/state":
@@ -368,6 +402,8 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as e:
                     return self._send(400, {"error": str(e)})
                 return self._send(200, mc.notify.masked())
+            if u.path.startswith("/api/today/"):
+                return self._send(200, today_post(u.path.rsplit("/", 1)[1], body))
             if u.path == "/api/notify-test":
                 cfg = mc.notify.load()
                 res = mc.notify.send(cfg, "Mission Control test", "If you can read this, notifications work.", "test", wait=True)

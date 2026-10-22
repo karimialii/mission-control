@@ -30,13 +30,14 @@
 | 💸 **Cost control** | Exact per-run tokens and cost, a per-run budget cap, and a model-call cap. The supervisor can pick a *cheaper* model on its own, but a pricier one needs your OK. |
 | 🔐 **Permission requests** | Agents run headless with an allow-list. A denied command becomes an **Allow / Don't allow** card that only you can answer. |
 | 🌿 **Git and teams** | Each task works in its own worktree and branch, merged into `mission/<name>` on approval. You can hand tasks to teammates as GitHub issues and PRs, and finish with one PR (with a preview first). |
+| ☀️ **Today page** | Start your day with to-dos, reminders and notes, plus to-dos suggested from emails you copy into a folder (no mail access needed). |
 | 🔔 **Notifications** | Get pinged on your desktop, phone (ntfy), Slack/Discord or any webhook when a decision is waiting, something fails or a mission finishes. |
 | ⏳ **Watches** | Wait for long external jobs (simulations, downloads) without polling and without spending tokens. |
 | 🔁 **Disposable chats** | `STATE.md` checkpoints let you drop a long supervisor chat and say "resume mission" in a fresh one. |
 | 🧪 **Simulator** | A fake executor that uses no tokens, so you can try the whole flow for free. |
 
 ## Contents
-[Quick start](#quick-start) · [Tour](#tour) · [Install](#install-once) · [Platforms and agents](#supported-platforms-and-agents) · [Use it in a project](#use-it-in-any-project) · [Models](#choose-your-models-expensive-supervisor-cheap-executors) · [Dashboard](#dashboard-one-for-all-projects) · [Watches](#waiting-for-long-jobs-watches) · [Notifications](#notifications) · [Safety limits](#safety-limits-nothing-loops-nothing-runs-away) · [Permissions](#permissions) · [Security model](#security-model-read-before-use) · [Teams and git](#teams-git-github-and-teammates) · [Runners](#runners-adding-any-ai) · [Token model](#token-model) · [Files](#files) · [License](#license)
+[Quick start](#quick-start) · [Tour](#tour) · [Install](#install-once) · [Platforms and agents](#supported-platforms-and-agents) · [Use it in a project](#use-it-in-any-project) · [Models](#choose-your-models-expensive-supervisor-cheap-executors) · [Dashboard](#dashboard-one-for-all-projects) · [Watches](#waiting-for-long-jobs-watches) · [Today](#today-your-start-of-day-page) · [Notifications](#notifications) · [Safety limits](#safety-limits-nothing-loops-nothing-runs-away) · [Permissions](#permissions) · [Security model](#security-model-read-before-use) · [Teams and git](#teams-git-github-and-teammates) · [Runners](#runners-adding-any-ai) · [Token model](#token-model) · [Files](#files) · [License](#license)
 
 ## Quick start
 **Fastest:** download the repo and run one command. It checks Python, git and which AI CLIs (Claude, Codex, Gemini) you have, picks a sensible default, and opens the dashboard.
@@ -97,6 +98,19 @@ Or open the dashboard, choose **All Projects → Add a project**, paste a folder
 </details>
 
 *Screenshots show the built-in simulator on demo projects.*
+
+## Today: your start-of-day page
+The dashboard opens on **Today**: your to-dos, reminders, notes, the projects waiting on you, and suggestions from your inbox.
+
+**Inbox without giving access to your mail.** Mission Control never connects to Outlook, Teams or any mail server. You copy emails and meeting notes into Markdown files in one folder (one email per file, or several separated by a `---` line) and set that folder under **Today → Settings**. Including the `From:`, `Date:` and `Subject:` lines makes sorting much more accurate.
+
+Every minute (or when you press **Process now**), each new email is read by a cheap model that has **no tools** and must answer in a fixed format. It picks the project the email is about, writes a one-line reason and suggests to-dos and reminders. Nothing is added until you accept it. Files that were read move to `processed/` inside the folder.
+
+- **Sorting by project** uses each project's name and goal, plus the "also known by" names you add in Settings (clients, colleagues, codenames). Unsure matches say so. When you move an email to another project, the sender is remembered and their next emails go there without asking the model.
+- **Reminders** ping your notification channels once at their time (see [Notifications](#notifications)).
+- **Who reads the emails:** Claude Haiku by default (about $0.001 per email), Sonnet, a **local command** that keeps the text on your computer (for example `["ollama","run","qwen2.5","--format","json"]`), or a free simulator for trying it out. **Check your organisation's rules before sending work email to a cloud model.**
+- Emails are treated as untrusted: the reader can't act, and instructions inside an email are ignored.
+- State is in `~/.mission-control/today/`, readable only by you.
 
 ## Notifications
 Long runs shouldn't wait on you. Mission Control can ping you when:
@@ -332,7 +346,7 @@ Runner templates live in `runners.default.json`. To override or add one, create 
   runs/T-001/         prompts, raw streams and transcripts per attempt
   STATE.md            compact resume file
 ```
-Global, in `~/.mission-control/`: `projects.json` (the project list), `notify.json` (notification settings, private), `notify.log` (delivery errors).
+Global, in `~/.mission-control/`: `projects.json` (the project list), `notify.json` (notification settings, private), `today/` (to-dos, reminders, inbox suggestions; private), `notify.log` (delivery errors).
 
 ## License
 MIT. See `LICENSE`.

@@ -112,5 +112,8 @@ Tasks have an attempt limit (3 by default). When it's reached the user is asked 
 ## Notifications
 The user can be pinged (desktop, phone via ntfy, Slack/Discord, webhook) when a decision is waiting, something fails, every task is done, or a watch fires. This happens automatically on every event, so **don't tell the user to keep the dashboard open, and don't ping them yourself**. Settings are global and the user's to change (`MC notify` is refused for you). If they ask to be notified, point them to **Chat → Notifications** or `MC notify set <desktop|ntfy|slack|webhook> [value]`, then `MC notify test`. Questions you send them (`MC ask`, `MC request-permission`, `MC request-model`) are what trigger a "decision" ping, so keep their text short and self-explanatory: it is the notification body.
 
+## Today page
+The dashboard's **Today** page holds the user's personal to-dos, reminders and inbox suggestions (`~/.mission-control/today/`). It is theirs: don't read or edit it unless they ask.
+
 ## Command cheat-sheet
 `init · plan · add · set · assign · sync-base · watch · request-model · request-permission · allow · notify · models · goal · approve · status · diff · sync · pr · git · done · checkpoint · brief · run · stop · cancel · wait · inbox · review · answer · ask · decide · note · autopilot · projects · dashboard`. Run `MC <cmd> -h` for flags.

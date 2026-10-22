@@ -397,6 +397,36 @@ code{font-family:var(--mono);font-size:.92em}
 @keyframes bStageOut{to{transform:scale(1.08);filter:blur(8px)}}
 .app.reveal{animation:bApp .9s var(--e) both}
 @keyframes bApp{from{opacity:.0;transform:scale(.985)}to{opacity:1;transform:none}}
+/* ── today ── */
+.today{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:960px){.today{grid-template-columns:minmax(0,1fr)}}
+.tpanel{padding:18px;margin-bottom:16px}
+.tpanel h3{margin:0 0 4px;font:600 15px var(--display)}
+.tgroup{font:600 11.5px var(--ui);color:var(--mute);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 2px}
+.tgroup.late{color:var(--red)}
+.trow{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.tgroup + .trow{border-top:0}
+.trow input[type=checkbox]{margin-top:3px;flex:none;width:16px;height:16px;accent-color:var(--green)}
+.trow .tx{flex:1;min-width:0;font-size:13.5px;line-height:1.4;overflow-wrap:anywhere}
+.trow.done .tx{color:var(--mute);text-decoration:line-through}
+.trow .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.tadd{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.tadd .inp{flex:1 1 200px}
+.tadd .sel,.tadd input[type=date],.tadd input[type=datetime-local]{flex:0 1 auto;width:auto}
+.scard{padding:14px 16px;border-radius:12px;background:var(--fill2);margin-top:10px}
+.scard .subj{font-weight:600;font-size:13.5px}
+.scard .why{font-size:12px;color:var(--mute);margin-top:2px}
+.sitem{display:flex;gap:8px;align-items:center;padding:6px 0;font-size:13px}
+.sitem .tx{flex:1;min-width:0}
+.conf{font:600 10.5px var(--ui);padding:2px 7px;border-radius:6px;text-transform:uppercase}
+.conf.high{background:color-mix(in srgb,var(--green) 16%,transparent);color:var(--green)}
+.conf.medium{background:color-mix(in srgb,var(--orange) 16%,transparent);color:var(--orange)}
+.conf.low{background:color-mix(in srgb,var(--pink) 16%,transparent);color:var(--pink)}
+.ibtn{border:0;background:var(--panel);color:var(--text);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;flex:none}
+.ibtn.ok{color:var(--green)} .ibtn:hover{background:var(--fill)}
+.tnotes{width:100%;min-height:120px;resize:vertical}
+.needrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);cursor:pointer}
+.needrow:first-of-type{border-top:0}
 </style>
 </head>
 <body>
@@ -435,6 +465,7 @@ const STATUS = ["todo","running","review","needs_changes","blocked","done"];
 const SLABEL = {todo:"Todo",running:"Running",review:"Review",needs_changes:"Needs changes",blocked:"Blocked",done:"Done",cancelled:"Cancelled"};
 const SCOL = s => `var(--s-${s})`;
 const ICONS = {
+  today:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/>',
   overview:'<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
   phases:'<rect x="3" y="4.5" width="9" height="4" rx="2"/><rect x="8" y="10" width="10" height="4" rx="2"/><rect x="13" y="15.5" width="8" height="4" rx="2"/>',
   board:'<rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="4" height="8" rx="1"/>',
@@ -443,13 +474,14 @@ const ICONS = {
   feed:'<path d="M4 6h16M4 12h10M4 18h13"/>',
   comms:'<path d="M21 12a8 8 0 0 1-11.8 7L3 21l2-5.5A8 8 0 1 1 21 12z"/>'
 };
-const VIEWS = [["overview","All Projects"],["comms","Chat"],["phases","Timeline"],["board","Board"],["agents","Agents"],["tokens","Usage"],["feed","Activity"]];
+const GLOBAL = new Set(["overview","today"]);
+const VIEWS = [["today","Today"],["overview","All Projects"],["comms","Chat"],["phases","Timeline"],["board","Board"],["agents","Agents"],["tokens","Usage"],["feed","Activity"]];
 const EVI = {init:["◎","var(--cyan)"],plan:["⌘","var(--violet)"],task_added:["+","var(--violet)"],run_started:["▶","var(--cyan)"],report:["✎","var(--violet)"],
   check:["✓","var(--lime)"],approved:["★","var(--lime)"],changes:["↺","var(--amber)"],question:["?","var(--magenta)"],answer:["↳","var(--cyan)"],
   note:["✉","var(--blue)"],error:["!","var(--red)"],stopped:["■","var(--amber)"],cancelled:["✕","var(--red)"],decision:["◆","var(--violet)"],
   checkpoint:["⧉","var(--mute)"],autopilot:["⟳","var(--cyan)"],task_updated:["⚙","var(--mute)"]};
 
-let S = {projects:[], cur:null, st:null, view: lsGet("mc.view") || "phases", drawer:null, feedFilter:"all", drafts:{}, logs:{}, logAttempt:null, hashes:{}};
+let S = {projects:[], cur:null, st:null, view: "today", drawer:null, feedFilter:"all", drafts:{}, logs:{}, logAttempt:null, hashes:{}};
 
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
@@ -487,6 +519,7 @@ async function tick(){
     const cp = S.projects.find(p=>p.path===S.cur);
     S.st = cp && cp.initialized ? await api("/api/state?p="+encodeURIComponent(S.cur)) : null;
     if(S.view==="tokens") await loadUsage();
+    if(S.view==="today") S.today=await api("/api/today").catch(()=>S.today);
     if(S.view==="comms" && !S._nBusy) S.notify=await api("/api/notify").catch(()=>S.notify);
     $("offline").style.display="none";
     render();
@@ -500,8 +533,8 @@ function changed(key, data){ const h=JSON.stringify(data); if(S.hashes[key]===h)
 
 function render(){
   renderNav(); renderHeader();
-  const v = S.view, cp = S.projects.find(p=>p.path===S.cur), splash = cp && !cp.initialized && v!=="overview";
-  const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
+  const v = S.view, cp = S.projects.find(p=>p.path===S.cur), splash = cp && !cp.initialized && !GLOBAL.has(v);
+  const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="today" ? [S.today, S.projects.map(p=>[p.name,p.needs_you,p.phase,p.counts])] : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
   if(changed("main", [splash?"ignite":v, S.cur, data, v==="comms"?S.notify:0])){
     const act = document.activeElement, aid = act && act.id, sel = act && act.selectionStart;
     const cl=$("chatlog"), stick=!cl || cl.scrollTop+cl.clientHeight>=cl.scrollHeight-40, qsTop=$("qscroll")?.scrollTop||0;
@@ -513,7 +546,7 @@ function render(){
   }
   if(S.drawer) renderDrawer();
 }
-const VIEW_FN = {overview:viewOverview, phases:viewPhases, board:viewBoard, agents:viewAgents, tokens:viewTokens, feed:viewFeed, comms:viewComms};
+const VIEW_FN = {today:viewToday, overview:viewOverview, phases:viewPhases, board:viewBoard, agents:viewAgents, tokens:viewTokens, feed:viewFeed, comms:viewComms};
 
 function renderNav(){
   const needs = (S.st?.questions||[]).filter(q=>q.to==="user"&&q.status==="open").length + (S.st?.mission.phase==="awaiting_approval"?1:0);
@@ -521,15 +554,15 @@ function renderNav(){
   if($("nav").innerHTML!==html) $("nav").innerHTML = html;
   const pl = S.projects.map(p=>{ const pct=p.total?Math.round(p.counts.done/p.total*100):0;
     const col=!p.initialized?"var(--s-cancelled)":p.supervisor?.running||p.counts?.running?"var(--blue)":p.needs_you||p.phase==="awaiting_approval"?"var(--orange)":pct===100?"var(--green)":"var(--s-todo)";
-    return `<div class="pwrap"><button class="pitem ${p.path===S.cur&&S.view!=="overview"?"active":""}" data-proj="${esc(p.path)}"><i class="dot" style="background:${col}"></i><span class="nm">${esc(p.name)}</span>${p.needs_you?`<em class="badge">${p.needs_you}</em>`:p.initialized&&p.total?`<span class="pct">${pct}%</span>`:""}</button><button class="premove-s" data-remove="${esc(p.path)}" title="Remove from dashboard" aria-label="Remove ${esc(p.name)} from the dashboard">×</button></div>`; }).join("");
+    return `<div class="pwrap"><button class="pitem ${p.path===S.cur&&!GLOBAL.has(S.view)?"active":""}" data-proj="${esc(p.path)}"><i class="dot" style="background:${col}"></i><span class="nm">${esc(p.name)}</span>${p.needs_you?`<em class="badge">${p.needs_you}</em>`:p.initialized&&p.total?`<span class="pct">${pct}%</span>`:""}</button><button class="premove-s" data-remove="${esc(p.path)}" title="Remove from dashboard" aria-label="Remove ${esc(p.name)} from the dashboard">×</button></div>`; }).join("");
   if($("projList").innerHTML!==pl) $("projList").innerHTML = pl;
   const cp=S.projects.find(p=>p.path===S.cur);
-  $("tbTitle").textContent = S.view==="overview" ? "All Projects" : (cp?.name || "Mission Control");
-  const gb=S.view!=="overview"&&gitInfo()?.branch;
-  $("tbSub").textContent = S.view==="overview" ? "" : (gb ? `⑂ ${gb}  ·  ` : "") + (cp?.goal || cp?.path || "");
+  $("tbTitle").textContent = S.view==="overview" ? "All Projects" : S.view==="today" ? "Today" : (cp?.name || "Mission Control");
+  const gb=!GLOBAL.has(S.view)&&gitInfo()?.branch;
+  $("tbSub").textContent = GLOBAL.has(S.view) ? "" : (gb ? `⑂ ${gb}  ·  ` : "") + (cp?.goal || cp?.path || "");
 }
 function renderHeader(){
-  const st=S.view==="overview"?null:S.st; if(!st){ if(changed("header","")) $("hstats").innerHTML=""; return; }
+  const st=GLOBAL.has(S.view)?null:S.st; if(!st){ if(changed("header","")) $("hstats").innerHTML=""; return; }
   const sp=st.supervisor||{}, gated=["briefing","awaiting_approval"].includes(st.mission.phase);
   const ts_=st.tasks, done=ts_.filter(t=>t.status==="done").length, run=ts_.filter(t=>t.status==="running"&&t.executor!=="human").length;
   const tok=ts_.reduce((a,t)=>a+tokIn(t.tokens||{})+(t.tokens?.output||0),0), cost=ts_.reduce((a,t)=>a+(t.tokens?.cost_usd||0),0);
@@ -849,6 +882,90 @@ function notifyPanel(){
     ${Object.entries(n.kind_labels).map(([k,l])=>`<label class="lrow" style="cursor:pointer"><span style="font-size:13px">${esc(l)}</span><input type="checkbox" data-nkind="${k}" ${n.kinds[k]?"checked":""}></label>`).join("")}
     <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn sm" id="notifyTest">Send a test</button></div></div>`;
 }
+/* ── today ── */
+function dfmt(d){ if(!d) return ""; const x=new Date(d.length>10?d:d+"T00:00"); return x.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"})+(d.length>10?" "+x.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"}):""); }
+function projName(path){ return (S.today?.projects||[]).find(p=>p.path===path)?.name; }
+function projSelect(attr, cur, extra=""){ const ps=S.today?.projects||[];
+  return `<select class="sel" ${attr} ${extra}><option value="">No project</option>${ps.map(p=>`<option value="${esc(p.path)}" ${p.path===cur?"selected":""}>${esc(p.name)}</option>`).join("")}</select>`; }
+function itemRow(it){
+  const pn=projName(it.project), late=it.due&&!it.done&&it.due<S.today.now.slice(0,10);
+  return `<div class="trow ${it.done?"done":""}"><input type="checkbox" data-tdone="${esc(it.id)}" ${it.done?"checked":""} aria-label="Done">
+    <div class="tx">${esc(it.text)}<div class="meta">${pn?`<span class="tag">${esc(pn)}</span>`:""}${it.due?`<span class="tag" style="${late?"color:var(--red)":""}">${late?"was due ":"due "}${dfmt(it.due)}</span>`:""}${it.remind_at?`<span class="tag">⏰ ${dfmt(it.remind_at)}</span>`:""}${it.source?`<span class="tag" title="From: ${esc(it.source.from||"")}">✉ ${esc(short(it.source.subject||it.source.file,40))}</span>`:""}</div></div>
+    <button class="x2" data-tact="del" data-id="${esc(it.id)}" aria-label="Delete">×</button></div>`;
+}
+function short(t,n){ t=String(t||""); return t.length>n?t.slice(0,n-1)+"…":t; }
+function viewToday(){
+  const T=S.today; if(!T) return head("Today","Loading…");
+  const now=T.now, day=now.slice(0,10), hr=+now.slice(11,13);
+  const hello=hr<12?"Good morning":hr<18?"Good afternoon":"Good evening";
+  const open=T.items.filter(i=>!i.done), todos=open.filter(i=>!i.remind_at), rem=open.filter(i=>i.remind_at).sort((a,b)=>a.remind_at.localeCompare(b.remind_at));
+  const doneToday=T.items.filter(i=>i.done&&(i.done_at||"").startsWith(day));
+  const groups=[["Overdue",todos.filter(i=>i.due&&i.due<day),"late"],["Today",todos.filter(i=>i.due===day)],["Coming up",todos.filter(i=>i.due&&i.due>day).sort((a,b)=>a.due.localeCompare(b.due))],["Anytime",todos.filter(i=>!i.due)]];
+  const needs=S.projects.filter(p=>p.needs_you||p.phase==="awaiting_approval");
+  const sugN=T.suggestions.reduce((a,s)=>a+s.items.filter(i=>i.state==="new").length,0);
+  const sub=`${new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})} · ${todos.length} to-do${todos.length===1?"":"s"}${rem.length?` · ${rem.length} reminder${rem.length===1?"":"s"}`:""}${sugN?` · ${sugN} suggested from your inbox`:""}`;
+  const needsP=needs.length?`<div class="panel tpanel qcard urgent"><h3>Waiting on you</h3>${needs.map(p=>`<div class="needrow" data-proj="${esc(p.path)}"><span>${esc(p.name)}</span><span class="muted" style="font-size:12.5px">${p.phase==="awaiting_approval"?"plan needs approval":p.needs_you+" decision"+(p.needs_you===1?"":"s")} ›</span></div>`).join("")}</div>`:"";
+  const todoP=`<div class="panel tpanel"><h3>To-dos</h3>
+    ${groups.filter(g=>g[1].length).map(([n,l,c])=>`<div class="tgroup ${c||""}">${n}</div>${l.map(itemRow).join("")}`).join("")||`<div class="muted" style="font-size:13px;margin-top:6px">Nothing to do. Add one below, or accept suggestions from your inbox.</div>`}
+    ${doneToday.length?`<div class="tgroup">Done today</div>${doneToday.map(itemRow).join("")}`:""}
+    <div class="tadd"><input class="inp" id="t-new" data-draft="t-new" placeholder="Add a to-do" value="${esc(S.drafts["t-new"]||"")}">
+      ${projSelect('id="t-proj" data-draft="t-proj"',S.drafts["t-proj"]||"")}<input class="inp" type="date" id="t-due" data-draft="t-due" value="${esc(S.drafts["t-due"]||"")}" aria-label="Due date">
+      <button class="btn sm primary" data-tact="add">Add</button></div></div>`;
+  const remP=`<div class="panel tpanel"><h3>Reminders</h3><p class="muted" style="font-size:12.5px;margin:0 0 6px">Each one pings your notification channels once, at its time.</p>
+    ${rem.map(itemRow).join("")||`<div class="muted" style="font-size:13px">No reminders.</div>`}
+    <div class="tadd"><input class="inp" id="r-new" data-draft="r-new" placeholder="Remind me to…" value="${esc(S.drafts["r-new"]||"")}">
+      <input class="inp" type="datetime-local" id="r-at" data-draft="r-at" value="${esc(S.drafts["r-at"]||"")}" aria-label="When">
+      <button class="btn sm primary" data-tact="remind">Add</button></div></div>`;
+  const cfg=T.config;
+  const inboxHead=!cfg.inbox?`<div class="qcard urgent panel" style="margin:10px 0 0;padding:14px"><b>Set up your inbox folder</b><div class="muted" style="font-size:12.5px;margin-top:4px">Copy emails and meeting notes into Markdown files in one folder. Mission Control reads them, sorts them by project and suggests to-dos and reminders. Set the folder in <b>Settings</b> below.</div></div>`
+    :!cfg.inbox_ok?`<div class="muted" style="color:var(--red);font-size:13px">The inbox folder ${esc(cfg.inbox)} doesn't exist any more. Change it in Settings.</div>`
+    :`<div class="muted" style="font-size:12.5px;display:flex;justify-content:space-between;gap:8px;align-items:center"><span>${T.busy?"Reading your inbox…":T.pending_files.length?`${T.pending_files.length} file${T.pending_files.length===1?"":"s"} waiting`:"Inbox is empty"}${T.cost_today?` · ${money(T.cost_today)} today`:""}</span>
+       <span style="display:flex;gap:6px"><button class="btn sm" data-tact="reveal">Open folder</button><button class="btn sm primary" data-tact="process" ${T.busy||!T.pending_files.length?"disabled":""}>Process now</button></span></div>`;
+  const errs=T.errors.length?`<div style="font-size:12px;color:var(--red);margin-top:8px">${T.errors.map(e=>`${esc(e.file)}: ${esc(e.error)}`).join("<br>")}</div>`:"";
+  const sugs=T.suggestions.slice().reverse().map(sg=>{ const e=sg.email, live=sg.items.map((it,i)=>[it,i]).filter(([it])=>it.state==="new");
+    return `<div class="scard"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="min-width:0"><div class="subj">${esc(e.subject||e.file)}</div>
+      <div class="why">${esc(e.from||"")}${e.date?" · "+esc(e.date):""}</div></div><span class="conf ${esc(sg.confidence)}">${esc(sg.confidence)}</span></div>
+      ${e.summary?`<div style="font-size:13px;margin-top:8px">${esc(e.summary)}</div>`:""}
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">${projSelect(`data-tmove="${esc(sg.id)}" aria-label="Project"`,sg.project||"")}<span class="why" style="flex:1;min-width:140px">${esc(sg.reason)}</span></div>
+      ${live.map(([it,i])=>`<div class="sitem"><span title="${it.kind}">${it.kind==="reminder"?"⏰":"☐"}</span><span class="tx">${esc(it.text)}${it.due||it.remind_at?` <span class="muted" style="font-size:12px">· ${dfmt(it.remind_at||it.due)}</span>`:""}</span>
+        <button class="ibtn ok" data-tact="acc" data-id="${esc(sg.id)}" data-i="${i}" aria-label="Accept" title="Add to my list">✓</button><button class="ibtn" data-tact="dis" data-id="${esc(sg.id)}" data-i="${i}" aria-label="Dismiss" title="Dismiss">×</button></div>`).join("")||`<div class="why" style="margin-top:6px">Nothing for you to do in this one.</div>`}
+      <details style="margin-top:6px"><summary class="muted" style="font-size:12px;cursor:pointer">Show email</summary><pre class="mono" style="white-space:pre-wrap;font-size:11.5px;max-height:240px;overflow:auto">${esc(e.excerpt)}</pre></details>
+      <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px">${live.length?`<button class="btn sm primary" data-tact="accall" data-id="${esc(sg.id)}">Accept all</button>`:""}<button class="btn sm" data-tact="disall" data-id="${esc(sg.id)}">${live.length?"Dismiss":"Done"}</button></div></div>`; }).join("");
+  const inboxP=`<div class="panel tpanel"><h3>From your inbox</h3>${inboxHead}${errs}${sugs}</div>`;
+  const notesP=`<div class="panel tpanel"><h3>Notes</h3><textarea class="tnotes" id="t-notes" data-tnotes data-draft="t-notes" placeholder="Anything for today. Saved when you click away.">${esc(S.drafts["t-notes"]??T.notes)}</textarea></div>`;
+  const rd=cfg.reader, rv=rd.type==="claude"?"claude:"+rd.model:rd.type;
+  const setP=`<details class="panel tpanel" ${!cfg.inbox?"open":""}><summary style="cursor:pointer"><h3 style="display:inline">Settings</h3></summary>
+    <div class="label" style="margin-top:12px">Inbox folder</div>
+    <div class="tadd" style="margin-top:6px"><input class="inp mono" id="t-inbox" data-draft="t-inbox" placeholder="~/Documents/Inbox" value="${esc(S.drafts["t-inbox"]??cfg.inbox)}"><button class="btn sm primary" data-tact="inbox">Save</button></div>
+    <label class="lrow" style="cursor:pointer"><span style="font-size:13px">Check the folder every minute</span><input type="checkbox" data-tauto ${cfg.auto?"checked":""}></label>
+    <div class="lrow"><div><div style="font-size:13px">Who reads the emails</div><div class="muted" style="font-size:12px">The email text is sent to this model. A local command keeps it on this computer.</div></div>
+      <select class="sel" data-treader>${[["claude:haiku","Claude Haiku (cheapest)"],["claude:sonnet","Claude Sonnet"],["command","Local command"],["simulator","Simulator (free demo)"]].map(([v,l])=>`<option value="${v}" ${v===rv?"selected":""}>${l}</option>`).join("")}</select></div>
+    ${rd.type==="command"?`<div class="tadd"><input class="inp mono" id="t-cmd" data-draft="t-cmd" placeholder='["ollama","run","qwen2.5","--format","json"]' value="${esc(S.drafts["t-cmd"]??JSON.stringify(rd.cmd||[]))}"><button class="btn sm" data-tact="cmd">Save</button></div>`:""}
+    <div class="label" style="margin-top:14px">How to recognise each project</div>
+    <p class="muted" style="font-size:12px;margin:4px 0 0">Client names, colleagues, codenames. The reader matches emails against these and each project's goal.</p>
+    ${T.projects.map(p=>`<div class="lrow"><span style="font-size:13px;flex:none;max-width:40%">${esc(p.name)}</span><input class="inp" data-tprof="${esc(p.path)}" placeholder="e.g. Acme, Sara, Stripe" value="${esc((cfg.profiles[p.path]||{}).aliases||"")}"></div>`).join("")||`<div class="muted" style="font-size:12.5px">Add a project first.</div>`}
+    ${cfg.rules.length?`<div class="label" style="margin-top:14px">Learned rules</div>${cfg.rules.map((r,i)=>`<div class="lrow"><span style="font-size:13px">${esc(r.from)} → ${esc(r.name)}</span><button class="x2" data-tact="rmrule" data-i="${i}" aria-label="Remove rule">×</button></div>`).join("")}`:""}</details>`;
+  return head(hello, sub) + `<div class="today"><div>${needsP}${todoP}${remP}</div><div>${inboxP}${notesP}${setP}</div></div>`;
+}
+async function todayPost(action, body){ S.today=await post("/api/today/"+action, body); delete S.hashes.main; render(); }
+async function todayAct(el){
+  const a=el.dataset.tact, id=el.dataset.id, i=el.dataset.i!==undefined?+el.dataset.i:null;
+  if(a==="add"){ const t=(S.drafts["t-new"]||"").trim(); if(!t) return toast("Write the to-do first",true);
+    await todayPost("add",{text:t,project:S.drafts["t-proj"]||null,due:S.drafts["t-due"]||null}); S.drafts["t-new"]=""; S.drafts["t-due"]=""; delete S.hashes.main; render(); return; }
+  if(a==="remind"){ const t=(S.drafts["r-new"]||"").trim(), at=S.drafts["r-at"]||""; if(!t||!at) return toast("Write the reminder and pick a time",true);
+    await todayPost("add",{text:t,remind_at:at}); S.drafts["r-new"]=""; S.drafts["r-at"]=""; delete S.hashes.main; render(); return; }
+  if(a==="del") return todayPost("item",{id,patch:{delete:true}});
+  if(a==="acc") return todayPost("suggestion",{id,action:"accept",item:i});
+  if(a==="dis") return todayPost("suggestion",{id,action:"dismiss",item:i});
+  if(a==="accall"){ await todayPost("suggestion",{id,action:"accept_all"}); return toast("Added to your list"); }
+  if(a==="disall") return todayPost("suggestion",{id,action:"dismiss_all"});
+  if(a==="process"){ await todayPost("process",{}); toast("Reading your inbox…"); return; }
+  if(a==="reveal") return post("/api/today/reveal",{});
+  if(a==="inbox"){ await todayPost("config",{config:{inbox:S.drafts["t-inbox"]??S.today.config.inbox}}); delete S.drafts["t-inbox"]; toast("Inbox folder saved"); return; }
+  if(a==="cmd"){ let c; try{ c=JSON.parse(S.drafts["t-cmd"]||"[]"); }catch(e){ return toast('Write it as a JSON list, e.g. ["ollama","run","qwen2.5"]',true); }
+    await todayPost("config",{config:{reader:{cmd:c}}}); toast("Saved"); return; }
+  if(a==="rmrule") return todayPost("config",{config:{remove_rule:i}});
+}
 function limitsPanel(){
   const mi=S.st.mission, sup=S.st.supervisor||{};
   const sel=(id,label,hint,cur,opts,fmtOpt)=>{ const all=[...new Set([...opts,cur].filter(x=>x!==undefined&&x!==null))].sort((a,b)=>(a===0?-1:b===0?1:a-b));
@@ -1022,10 +1139,10 @@ async function refreshLog(){
 
 /* ───────── events ───────── */
 document.addEventListener("click", async e=>{
-  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
+  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
   if(!el) return;
   try{
-    if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(S.view!=="overview"){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
+    if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(!GLOBAL.has(S.view)){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
     if(el.dataset.ignite){ e.stopPropagation(); el.disabled=true; el.textContent="Igniting…"; const models=$("ig-sr")?readPicker("ig-"):undefined; if(models) lsSet("mc.models",JSON.stringify(models));
       await post("/api/ignite",{p:el.dataset.ignite,models}).catch(()=>{el.disabled=false});
       selectProject(el.dataset.ignite,"comms"); toast("Mission Control ignited. Your supervisor is looking around"); await tick(); return; }
@@ -1046,6 +1163,7 @@ document.addEventListener("click", async e=>{
       if(!confirm(`Remove "${p.name}" from the dashboard?\n\nYour files and the Mission Control data in the project stay exactly where they are. You can add the folder again at any time.${warn}`)) return;
       await post("/api/remove-project",{p:p.path}); if(S.cur===p.path){ S.cur=null; S.view="overview"; lsSet("mc.view","overview"); } S.hashes={}; toast(`Removed "${p.name}". Its files are untouched`); await tick(); return; }
     if(el.id==="sendChat"){ return sendChat(); }
+    if(el.dataset.tact){ await todayAct(el); return; }
     if(el.dataset.nsave){ const n=el.dataset.nsave, v=(S.drafts["nf-"+n]||"").trim(); if(!v) return toast("Paste the "+(n==="ntfy"?"topic":"URL")+" first",true);
       S.notify=await post("/api/notify",{channels:{[n]:{[n==="ntfy"?"topic":"url"]:v,on:true}}}); S.drafts["nf-"+n]=""; delete S.hashes.main; toast("Saved"); render(); return; }
     if(el.id==="notifyTest"){ const r=await post("/api/notify-test",{}); const bad=Object.entries(r.results).filter(([,v])=>v!=="ok");
@@ -1099,8 +1217,8 @@ function selectProject(path, view){
     S.st=null; S.usage=null; S.usageOpen=new Set(); S.usageCalls={}; S.usageFilter="all"; S.logs={}; S.hashes={}; closeDrawer();
   }
   S.usageScope="project";
-  S.view = view || (S.view==="overview" ? S.lastView : S.view);
-  if(S.view!=="overview"){ S.lastView=S.view; lsSet("mc.lastview",S.view); }
+  S.view = view || (GLOBAL.has(S.view) ? S.lastView : S.view);
+  if(!GLOBAL.has(S.view)){ S.lastView=S.view; lsSet("mc.lastview",S.view); }
   lsSet("mc.view",S.view);
 }
 async function sendChat(){
@@ -1110,10 +1228,17 @@ async function sendChat(){
   await tick();
 }
 document.addEventListener("keydown", e=>{ if(e.target.id==="permRule" && e.key==="Enter"){ e.preventDefault(); $("addPerm")?.click(); } if(e.target.id==="chat-box" && e.key==="Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); sendChat(); }
-  if(e.target.id==="addPath" && e.key==="Enter"){ e.preventDefault(); $("addBtn")?.click(); } });
+  if(e.target.id==="addPath" && e.key==="Enter"){ e.preventDefault(); $("addBtn")?.click(); }
+  if((e.target.id==="t-new"||e.target.id==="r-new") && e.key==="Enter"){ e.preventDefault(); document.querySelector(`[data-tact="${e.target.id==="t-new"?"add":"remind"}"]`)?.click(); } });
 document.addEventListener("input", e=>{ const k=e.target.dataset?.draft; if(k) S.drafts[k]=e.target.value;
   if(e.target.id==="addPath"){ const was=S._wasRepo, now=looksRepo(e.target.value); S._wasRepo=now; if(was!==now){ delete S.hashes.main; const pos=e.target.selectionStart; render(); const i=$("addPath"); if(i){ i.focus(); i.setSelectionRange(pos,pos); } } } });
 document.addEventListener("change", async e=>{ const t=e.target;
+  if(t.dataset?.tdone) return todayPost("item",{id:t.dataset.tdone,patch:{done:t.checked}}).catch(()=>{});
+  if(t.dataset?.tmove!==undefined){ await todayPost("suggestion",{id:t.dataset.tmove,action:"move",project:t.value||null}).catch(()=>{}); return toast(t.value?"Moved. Emails from this sender will go there from now on":"Moved"); }
+  if(t.dataset?.tauto!==undefined) return todayPost("config",{config:{auto:t.checked}}).catch(()=>{});
+  if(t.dataset?.treader!==undefined){ const [ty,md]=t.value.split(":"); return todayPost("config",{config:{reader:{type:ty,...(md?{model:md}:{})}}}).catch(()=>{}); }
+  if(t.dataset?.tprof) return todayPost("config",{config:{profile:{project:t.dataset.tprof,aliases:t.value}}}).then(()=>toast("Saved")).catch(()=>{});
+  if(t.dataset?.tnotes!==undefined){ await todayPost("notes",{text:t.value}).catch(()=>{}); delete S.drafts["t-notes"]; return toast("Notes saved"); }
   if(t.dataset?.nmaster!==undefined){ S.notify=await post("/api/notify",{enabled:t.checked}).catch(()=>S.notify); delete S.hashes.main; render(); return; }
   if(t.dataset?.nchan){ S.notify=await post("/api/notify",{channels:{[t.dataset.nchan]:{on:t.checked}}}).catch(e=>{toast(e.message); return S.notify;}); delete S.hashes.main; render(); return; }
   if(t.dataset?.nkind){ S.notify=await post("/api/notify",{kinds:{[t.dataset.nkind]:t.checked}}).catch(()=>S.notify); delete S.hashes.main; render(); return; }
