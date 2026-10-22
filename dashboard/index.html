@@ -397,6 +397,42 @@ code{font-family:var(--mono);font-size:.92em}
 @keyframes bStageOut{to{transform:scale(1.08);filter:blur(8px)}}
 .app.reveal{animation:bApp .9s var(--e) both}
 @keyframes bApp{from{opacity:.0;transform:scale(.985)}to{opacity:1;transform:none}}
+/* ── chat ── */
+.comms{grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr)}
+.comms.solo{grid-template-columns:minmax(0,1fr);max-width:920px;margin:0 auto}
+.chat{height:calc(100dvh - 200px);position:relative}
+.chat-log{scroll-behavior:auto;overscroll-behavior:contain;padding:18px 20px 24px}
+.msg{max-width:82%}
+.msg.sup{max-width:88%}
+.msg.cont{margin-top:3px}
+.msg.me.cont{border-top-right-radius:8px}.msg.sup.cont{border-top-left-radius:8px}
+.dayline{display:flex;align-items:center;gap:10px;margin:14px 0 4px;color:var(--mute);font-size:11.5px}
+.dayline::before,.dayline::after{content:"";flex:1;height:1px;background:var(--line)}
+.chat-empty{margin:auto;text-align:center;max-width:380px;display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+.chat-empty .big{font-size:34px}
+.jump{position:absolute;right:18px;bottom:86px;border:0;border-radius:980px;padding:7px 13px;background:var(--blue);color:#fff;font:600 12.5px var(--ui);box-shadow:var(--shadow);cursor:pointer;opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .15s,transform .15s}
+.jump.on{opacity:1;transform:none;pointer-events:auto}
+.composer textarea{resize:none;overflow-y:auto}
+.composer-hint{font-size:11px;color:var(--dim);padding:0 18px 8px;text-align:right}
+.side{max-height:calc(100dvh - 200px);overflow:auto;padding-right:2px}
+@media(max-width:960px){.comms{grid-template-columns:minmax(0,1fr)}.side{max-height:none}}
+/* ── settings ── */
+.settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+@media(max-width:1000px){.settings{grid-template-columns:minmax(0,1fr)}}
+.mode{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:12px;margin-top:8px;cursor:pointer;background:var(--fill2)}
+.mode.on{box-shadow:0 0 0 1.5px var(--blue)}
+.mode input{margin-top:3px;accent-color:var(--blue)}
+.snap{border-top:1px solid var(--line)}
+.tgroup + .snap{border-top:0}
+.snaprow{display:flex;gap:10px;align-items:center;padding:8px 2px;cursor:pointer}
+.snaprow .tx{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.snapbody{padding:4px 2px 12px}
+.chrow{display:flex;gap:8px;align-items:center;padding:3px 0}
+.chrow .tx{flex:1;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st{font:700 10.5px var(--mono);width:18px;text-align:center;border-radius:4px;padding:1px 0}
+.st-M{color:var(--orange);background:color-mix(in srgb,var(--orange) 14%,transparent)}
+.st-D{color:var(--red);background:color-mix(in srgb,var(--red) 14%,transparent)}
+.st-A{color:var(--green);background:color-mix(in srgb,var(--green) 14%,transparent)}
 /* ── today ── */
 .today{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
 @media(max-width:960px){.today{grid-template-columns:minmax(0,1fr)}}
@@ -465,6 +501,7 @@ const STATUS = ["todo","running","review","needs_changes","blocked","done"];
 const SLABEL = {todo:"Todo",running:"Running",review:"Review",needs_changes:"Needs changes",blocked:"Blocked",done:"Done",cancelled:"Cancelled"};
 const SCOL = s => `var(--s-${s})`;
 const ICONS = {
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   today:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/>',
   overview:'<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
   phases:'<rect x="3" y="4.5" width="9" height="4" rx="2"/><rect x="8" y="10" width="10" height="4" rx="2"/><rect x="13" y="15.5" width="8" height="4" rx="2"/>',
@@ -475,7 +512,7 @@ const ICONS = {
   comms:'<path d="M21 12a8 8 0 0 1-11.8 7L3 21l2-5.5A8 8 0 1 1 21 12z"/>'
 };
 const GLOBAL = new Set(["overview","today"]);
-const VIEWS = [["today","Today"],["overview","All Projects"],["comms","Chat"],["phases","Timeline"],["board","Board"],["agents","Agents"],["tokens","Usage"],["feed","Activity"]];
+const VIEWS = [["today","Today"],["overview","All Projects"],["comms","Chat"],["phases","Timeline"],["board","Board"],["agents","Agents"],["tokens","Usage"],["feed","Activity"],["settings","Settings"]];
 const EVI = {init:["◎","var(--cyan)"],plan:["⌘","var(--violet)"],task_added:["+","var(--violet)"],run_started:["▶","var(--cyan)"],report:["✎","var(--violet)"],
   check:["✓","var(--lime)"],approved:["★","var(--lime)"],changes:["↺","var(--amber)"],question:["?","var(--magenta)"],answer:["↳","var(--cyan)"],
   note:["✉","var(--blue)"],error:["!","var(--red)"],stopped:["■","var(--amber)"],cancelled:["✕","var(--red)"],decision:["◆","var(--violet)"],
@@ -520,7 +557,7 @@ async function tick(){
     S.st = cp && cp.initialized ? await api("/api/state?p="+encodeURIComponent(S.cur)) : null;
     if(S.view==="tokens") await loadUsage();
     if(S.view==="today") S.today=await api("/api/today").catch(()=>S.today);
-    if(S.view==="comms" && !S._nBusy) S.notify=await api("/api/notify").catch(()=>S.notify);
+    if(S.view==="settings"){ S.notify=await api("/api/notify").catch(()=>S.notify); if(S.st) S.snaps=await api("/api/snapshots?p="+encodeURIComponent(S.cur)).catch(()=>S.snaps); }
     $("offline").style.display="none";
     render();
     if(S.drawer) refreshLog();
@@ -535,18 +572,20 @@ function render(){
   renderNav(); renderHeader();
   const v = S.view, cp = S.projects.find(p=>p.path===S.cur), splash = cp && !cp.initialized && !GLOBAL.has(v);
   const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="today" ? [S.today, S.projects.map(p=>[p.name,p.needs_you,p.phase,p.counts])] : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
-  if(changed("main", [splash?"ignite":v, S.cur, data, v==="comms"?S.notify:0])){
+  if(changed("main", [splash?"ignite":v, S.cur, data, v==="settings"?[S.notify,S.snaps,S.snapOpen,S.snapChanges,S.st?.access,S.st?.mission,S.st?.supervisor]:0])){
     const act = document.activeElement, aid = act && act.id, sel = act && act.selectionStart;
-    const cl=$("chatlog"), stick=!cl || cl.scrollTop+cl.clientHeight>=cl.scrollHeight-40, qsTop=$("qscroll")?.scrollTop||0;
+    const cl=$("chatlog"), stick=!cl || S.chatBottom || cl.scrollTop+cl.clientHeight>=cl.scrollHeight-60, clTop=cl?.scrollTop||0, sideTop=document.querySelector(".side")?.scrollTop||0, qsTop=$("qscroll")?.scrollTop||0;
     $("main").innerHTML = `<div class="wrap">${splash ? viewIgnite(cp) : (VIEW_FN[v]||viewPhases)()}</div>`;
-    if($("chatlog") && stick) $("chatlog").scrollTop=$("chatlog").scrollHeight;
+    const ncl=$("chatlog"); if(ncl){ if(stick){ ncl.scrollTop=ncl.scrollHeight; requestAnimationFrame(()=>{ ncl.scrollTop=ncl.scrollHeight; }); } else ncl.scrollTop=clTop; S.chatBottom=false; updateJump(); }
+    const nside=document.querySelector(".side"); if(nside) nside.scrollTop=sideTop;
+    const cb=$("chat-box"); if(cb) growBox(cb);
     if($("qscroll")) $("qscroll").scrollTop=qsTop;
     if(v==="agents") hydrateTerms();
     if(aid && $(aid)){ $(aid).focus(); try{ $(aid).setSelectionRange(sel,sel); }catch(e){} }
   }
   if(S.drawer) renderDrawer();
 }
-const VIEW_FN = {today:viewToday, overview:viewOverview, phases:viewPhases, board:viewBoard, agents:viewAgents, tokens:viewTokens, feed:viewFeed, comms:viewComms};
+const VIEW_FN = {settings:viewSettings, today:viewToday, overview:viewOverview, phases:viewPhases, board:viewBoard, agents:viewAgents, tokens:viewTokens, feed:viewFeed, comms:viewComms};
 
 function renderNav(){
   const needs = (S.st?.questions||[]).filter(q=>q.to==="user"&&q.status==="open").length + (S.st?.mission.phase==="awaiting_approval"?1:0);
@@ -977,42 +1016,95 @@ function limitsPanel(){
     ${sel("lim-calls","Model calls per executor run","A run is stopped after this many steps.",mi.executor_max_turns||0,[0,10,20,30,50,80,120],v=>v?v+" calls":"No cap")}
     ${sup.mode==="dashboard"?sel("lim-sup","Supervisor turns without you","It pauses after this many turns in a row.",sup.max_auto_turns||40,[10,20,40,80,160],v=>v+" turns"):""}</div>`;
 }
+function updateJump(){ const c=$("chatlog"), j=$("jumpChat"); if(!c||!j) return; j.classList.toggle("on", c.scrollTop+c.clientHeight < c.scrollHeight-120); }
+function growBox(t){ t.style.height="auto"; t.style.height=Math.min(180,t.scrollHeight)+"px"; }
+document.addEventListener("scroll", e=>{ if(e.target.id==="chatlog") updateJump(); }, true);
+function chatMsgs(st, dash){
+  let prev=null, out="";
+  st.chat.forEach(c=>{
+    const day=(c.ts||"").slice(0,10);
+    if(!prev || day!==(prev.ts||"").slice(0,10)) out+=`<div class="dayline"><span>${new Date(c.ts).toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"short"})}</span></div>`;
+    if(c.role==="system"){ out+=`<div class="msg sys">${esc(c.text)}</div>`; prev=c; return; }
+    const me=c.role==="user", cont=prev&&prev.role===c.role&&(ts(c.ts)-ts(prev.ts))<5*60000&&day===(prev.ts||"").slice(0,10);
+    out+=`<div class="msg ${me?"me":"sup"} ${cont?"cont":""}">${cont?"":`<div class="who">${me?"You":"Supervisor"} <span>${clock(c.ts)}${!me&&c.cost?` · ${money(c.cost)}`:""}${me&&!c.delivered&&dash?" · queued":""}</span></div>`}<div class="${me?"":"md-lite"}">${me?esc(c.text).replace(/\n/g,"<br>"):md(c.text)}</div></div>`;
+    prev=c;
+  });
+  return out;
+}
+function decisionCard(q){
+  return q.permission?permCard(q):`<div class="panel qcard urgent">
+    <div class="mono muted" style="font-size:11px">${q.id}${q.task?" · "+q.task:""} · ${ago(q.created)} ago</div><h4>${esc(q.question)}</h4>
+    ${q.options?.length?`<div class="opts">${q.options.map(o=>`<button class="opt ${o===q.recommendation?"rec":""}" data-answer="${esc(q.id)}" data-val="${esc(o)}">${esc(o)}</button>`).join("")}</div>`:""}
+    <textarea id="ans-${esc(q.id)}" data-draft="ans-${esc(q.id)}" placeholder="Or write your own answer…">${esc(S.drafts["ans-"+q.id]||"")}</textarea>
+    <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn primary sm" data-answer-text="${esc(q.id)}">Send answer</button></div></div>`;
+}
 function viewComms(){
   const st=S.st; if(!st) return head("Chat","")+noMission();
   const sp=st.supervisor||{}, dash=sp.mode==="dashboard", Q=st.questions;
   const mine=Q.filter(q=>q.to==="user"&&q.status==="open"), chain=Q.filter(q=>q.to==="supervisor").reverse();
-  const msgs=st.chat.map(c=>{
-    if(c.role==="system") return `<div class="msg sys">${esc(c.text)}</div>`;
-    const me=c.role==="user";
-    return `<div class="msg ${me?"me":"sup"}"><div class="who">${me?"You":"Supervisor"} <span>${clock(c.ts)}${!me&&c.cost?` · ${money(c.cost)}`:""}${me&&!c.delivered&&dash?" · queued":""}</span></div><div class="${me?"":"md-lite"}">${me?esc(c.text).replace(/\n/g,"<br>"):md(c.text)}</div></div>`;
-  }).join("");
   const typing = sp.running ? `<div class="msg sup typing"><div class="who">Supervisor <span>${esc(sp.step||"thinking")}</span></div><div class="dots"><i></i><i></i><i></i></div></div>` : "";
-  const intro = !st.chat.length ? `<div class="msg sys">${dash?"Your supervisor will appear here. Tell it what you want to build.":"This mission's supervisor runs in an external chat (e.g. Claude Code). Messages you send here are delivered to it as notes."}</div>` : "";
-  return head("Chat", dash?`Talk to your supervisor (${esc(supLabel())}). It plans, delegates and reviews. Executors never talk to you.`:"Supervisor runs in an external chat. Messages here are delivered as notes.",
-      `<div class="gstats">${dash?`${S.st.resume_cmd?`<button class="btn sm" id="ccCopy" title="Copies a command that opens this supervisor chat in Claude Code. Run it in a terminal.">Open in Claude Code</button>`:""}<button class="btn sm" id="supReset" title="Start a fresh supervisor session from the mission state (saves tokens)">↻ Fresh session</button>`:`<button class="btn sm" id="supTake" title="Let the dashboard run the supervisor">Run supervisor here</button>`}</div>`)
-   + approveBanner() + prBanner()
-   + `<div class="comms"><div class="panel chat"><div class="chat-log" id="chatlog">${intro}${msgs}${typing}</div>
-        <div class="composer"><textarea id="chat-box" data-draft="chat" placeholder="${st.mission.phase==="briefing"?"Describe what you want to build, who it's for, and what done looks like…":"Message your supervisor"}">${esc(S.drafts.chat||"")}</textarea>
-        <button class="btn primary" id="sendChat">Send ➤</button></div></div>
-      <div>
-      ${mine.length?`<div class="label" style="margin-bottom:10px">Decisions waiting on you <span style="color:var(--magenta)">· ${mine.length}</span></div>`:""}
-      ${mine.map(q=>q.permission?permCard(q):`<div class="panel qcard urgent">
-        <div class="mono muted" style="font-size:11px">${q.id}${q.task?" · "+q.task:""} · ${ago(q.created)} ago</div><h4>${esc(q.question)}</h4>
-        ${q.options?.length?`<div class="opts">${q.options.map(o=>`<button class="opt ${o===q.recommendation?"rec":""}" data-answer="${esc(q.id)}" data-val="${esc(o)}">${esc(o)}</button>`).join("")}</div>`:""}
-        <textarea id="ans-${esc(q.id)}" data-draft="ans-${esc(q.id)}" placeholder="Or write your own answer…">${esc(S.drafts["ans-"+q.id]||"")}</textarea>
-        <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn primary sm" data-answer-text="${esc(q.id)}">Send answer</button></div></div>`).join("")}
-            ${watchPanel()}
-      ${permPanel()}
-      ${limitsPanel()}
-      ${notifyPanel()}
-      <div class="panel qcard"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div class="label">Models and effort</div><button class="btn sm primary" id="saveModels">Save</button></div>
-        <p class="muted" style="font-size:12.5px;margin:0 0 12px"><b>Effort</b> is how hard the model thinks before answering. Higher is more thorough on hard problems but slower and costlier. Lower is fine for routine tasks.</p>
-        ${modelPicker("md-", st.runners, {sr:sp.runner||"claude-supervisor", sm:sp.model||"", se:sp.effort||"", er:st.mission.default_executor||"claude", em:st.mission.executor_model||"", ee:st.mission.executor_effort||""})}</div>
-<div class="label" style="margin-bottom:10px">Executor questions</div>
-      <div class="panel qscroll" id="qscroll">${chain.map(q=>`<div class="thread" data-task="${esc(q.task||"")}" style="cursor:pointer"><div class="mono muted" style="font-size:11px">${q.id} · ${ago(q.created)} ago · ${q.status==="open"?'<span style="color:var(--magenta)">waiting for supervisor</span>':'<span style="color:var(--lime)">answered</span>'}</div>
+  const intro = !st.chat.length ? `<div class="chat-empty"><div class="big">👋</div><b>${dash?"Say hello to your supervisor":"Supervisor runs in an external chat"}</b><div class="muted">${dash?"Tell it what you want to build, who it's for and what done looks like. It plans the work, hands tasks to cheaper models and reviews them.":"This mission's supervisor runs in another chat (e.g. Claude Code). Messages you send here reach it as notes."}</div></div>` : "";
+  const side = `${mine.length?`<div class="label" style="margin-bottom:10px">Decisions waiting on you <span style="color:var(--magenta)">· ${mine.length}</span></div>${mine.map(decisionCard).join("")}`:""}
+      ${watchPanel()}
+      ${chain.length?`<div class="label" style="margin:4px 0 10px">Executor questions</div>
+      <div class="panel qscroll" id="qscroll">${chain.map(q=>`<div class="thread" data-task="${esc(q.task||"")}" style="cursor:pointer"><div class="mono muted" style="font-size:11px">${q.id} · ${ago(q.created)} ago · ${q.status==="open"?'<span style="color:var(--magenta)">waiting for supervisor</span>':'<span style="color:var(--green)">answered</span>'}</div>
         <div class="bubble q"><small>${esc(q.from)} (executor)</small>${esc(q.question)}</div>
-        ${q.status==="answered"?`<div class="bubble a"><small>${esc(q.answered_by==="user"?"You":"Supervisor")}</small>${esc(q.answer)}</div>`:""}</div>`).join("")||'<div class="thread muted">No executor questions yet.</div>'}</div>
-      </div></div>`;
+        ${q.status==="answered"?`<div class="bubble a"><small>${esc(q.answered_by==="user"?"You":"Supervisor")}</small>${esc(q.answer)}</div>`:""}</div>`).join("")}</div>`:""}`;
+  const hasSide = side.trim().length>0;
+  return head("Chat", dash?`Your supervisor (${esc(supLabel())}) plans, delegates and reviews. Executors never talk to you.`:"Supervisor runs in an external chat. Messages here are delivered as notes.",
+      `<div class="gstats">${dash?`${S.st.resume_cmd?`<button class="btn sm" id="ccCopy" title="Copies a command that opens this supervisor chat in Claude Code. Run it in a terminal.">Open in Claude Code</button>`:""}<button class="btn sm" id="supReset" title="Start a fresh supervisor session from the mission state (saves tokens)">↻ Fresh session</button>`:`<button class="btn sm" id="supTake" title="Let the dashboard run the supervisor">Run supervisor here</button>`}<button class="btn sm" data-view="settings" title="Access, snapshots, limits, models, notifications">⚙︎ Settings</button></div>`)
+   + approveBanner() + prBanner()
+   + `<div class="comms ${hasSide?"":"solo"}"><div class="panel chat"><div class="chat-log" id="chatlog">${intro}${chatMsgs(st,dash)}${typing}</div>
+        <button class="jump" id="jumpChat" type="button" aria-label="Jump to the latest message">↓ Latest</button>
+        <div class="composer"><textarea id="chat-box" data-draft="chat" rows="1" placeholder="${st.mission.phase==="briefing"?"Describe what you want to build, who it's for, and what done looks like…":"Message your supervisor"}">${esc(S.drafts.chat||"")}</textarea>
+        <button class="btn primary" id="sendChat" aria-label="Send">Send ➤</button></div>
+        <div class="composer-hint">Enter to send · Shift+Enter for a new line</div></div>
+      ${hasSide?`<div class="side">${side}</div>`:""}</div>`;
+}
+/* ── settings (per project, plus global notifications) ── */
+function accessPanel(){
+  const a=S.st.access||{}, allow=S.st.mission.permissions?.allow||[], sb=a.mode==="sandbox";
+  const bashRules=allow.filter(r=>r.startsWith("Bash(")), other=allow.filter(r=>!r.startsWith("Bash(")&&!r.startsWith("Domain("));
+  const opt=(v,t,d)=>`<label class="mode ${(a.chosen||"sandbox")===v?"on":""}"><input type="radio" name="acc" data-access="${v}" ${(a.chosen||"sandbox")===v?"checked":""} ${v==="sandbox"&&!a.supported?"disabled":""}><div><b>${t}</b><div class="muted" style="font-size:12.5px;margin-top:2px">${d}</div></div></label>`;
+  return `<div class="panel qcard"><div class="label">What agents can do</div>
+    ${opt("sandbox","Full access inside the project (recommended)","The supervisor and executors run any command without asking. The operating system keeps them inside this project folder: they can't write anywhere else, can't read your keys (SSH, cloud, GitHub logins) and only reach the internet sites listed below. Snapshots let you undo anything.")}
+    ${opt("allowlist","Only allowed commands","The older mode: each kind of command must be allowed one by one, and agents stop to ask when something isn't on the list.")}
+    ${!a.supported?`<div class="muted" style="font-size:12.5px;color:var(--orange)">The sandbox isn't available on this system (it needs macOS, or Linux with bubblewrap and socat), so agents use allowed commands.</div>`:""}
+    ${sb?`<div class="label" style="margin-top:14px">Internet sites agents can reach</div>
+      <div class="rules">${(a.domains||[]).map(d=>`<span class="rule"><code>${esc(d)}</code><button class="x2" data-rmdom="${esc(d)}" aria-label="Remove ${esc(d)}">×</button></span>`).join("")||'<span class="muted" style="font-size:12.5px">None: agents are offline.</span>'}</div>
+      <div style="display:flex;gap:8px;margin-top:8px"><input class="inp" id="domIn" data-draft="domIn" placeholder="example.com  or  *.example.com" value="${esc(S.drafts.domIn||"")}"><button class="btn sm primary" id="addDom">Add</button><button class="btn sm" id="resetDom" title="Back to: ${esc((a.default_domains||[]).join(", "))}">Defaults</button></div>`:""}
+    ${other.length||!sb?`<div class="label" style="margin-top:14px">${sb?"Extra tools":"Allowed commands"}</div>
+      <div class="rules">${(sb?other:allow).map(r=>`<span class="rule"><code>${esc(r)}</code><button class="x2" data-rmperm="${esc(r)}" aria-label="Remove ${esc(r)}">×</button></span>`).join("")||'<span class="muted" style="font-size:12.5px">Only the defaults.</span>'}</div>`:""}
+    <div style="display:flex;gap:8px;margin-top:8px"><input class="inp" id="permRule" data-draft="permRule" placeholder="${sb?"WebSearch  or  WebFetch":"Bash(~/venvs/env/bin/python *)  or  WebSearch"}" value="${esc(S.drafts.permRule||"")}"><button class="btn sm" id="addPerm">Allow</button></div>
+    ${sb&&bashRules.length?`<div class="muted" style="font-size:12.5px;margin-top:12px;display:flex;justify-content:space-between;gap:10px;align-items:center"><span>${bashRules.length} command rule${bashRules.length===1?"":"s"} from the old mode aren't needed any more.</span><button class="btn sm" id="clearBash">Clear them</button></div>`:""}</div>`;
+}
+function snapPanel(){
+  const sn=S.snaps; if(!sn) return `<div class="panel qcard"><div class="label">Snapshots</div><div class="muted" style="font-size:12.5px">Loading…</div></div>`;
+  if(!sn.available) return `<div class="panel qcard"><div class="label">Snapshots</div><div class="muted" style="font-size:12.5px">Snapshots need git, which isn't installed.</div></div>`;
+  const kb=sn.size/1024, size=kb>1024?(kb/1024).toFixed(1)+" MB":Math.max(1,Math.round(kb))+" KB";
+  const byDay={}; sn.list.forEach(x=>(byDay[x.ts.slice(0,10)]=byDay[x.ts.slice(0,10)]||[]).push(x));
+  const row=x=>{ const open=S.snapOpen===x.ref, ch=S.snapChanges?.[x.ref];
+    return `<div class="snap ${open?"open":""}"><div class="snaprow" data-snap="${esc(x.ref)}"><span class="mono" style="font-size:12.5px">${x.ts.slice(11,16)}</span><span class="tx">${esc(x.reason)}</span><span class="muted" style="font-size:12px">${open?"▾":"▸"}</span></div>
+      ${open?`<div class="snapbody">${!ch?'<div class="muted" style="font-size:12.5px">Comparing with the folder now…</div>':!ch.length?'<div class="muted" style="font-size:12.5px">The folder is the same as this snapshot.</div>':
+        `<div class="muted" style="font-size:12px;margin-bottom:6px">${ch.length===1?"1 file differs":ch.length+" files differ"} from now. M changed · D deleted since · A new since (kept when you restore)</div>
+        ${ch.slice(0,60).map(c=>`<div class="chrow"><span class="st st-${c.status}">${c.status}</span><span class="mono tx">${esc(c.path)}</span>${c.status!=="A"?`<button class="btn sm" data-restore="${esc(x.ref)}" data-path="${esc(c.path)}">Restore</button>`:""}</div>`).join("")}
+        ${ch.length>60?`<div class="muted" style="font-size:12px">…and ${ch.length-60} more</div>`:""}
+        <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn sm primary" data-restore="${esc(x.ref)}">Restore every file from this snapshot</button></div>`}</div>`:""}</div>`; };
+  return `<div class="panel qcard"><div style="display:flex;justify-content:space-between;align-items:center"><div class="label">Snapshots</div><input type="checkbox" data-snapon ${sn.on?"checked":""} aria-label="Snapshots on"></div>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px">A copy of the project is saved before every agent run and every ${sn.every_min} minutes while agents work, and kept ${sn.keep_days} days. Unchanged files are stored once (${size} used). Files over 50 MB, online-only cloud files and folders like node_modules are skipped.</p>
+    ${sn.error?`<div style="font-size:12px;color:var(--red);margin-bottom:8px">Last problem: ${esc(sn.error)}</div>`:""}
+    <div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn sm" id="snapNow" ${sn.busy?"disabled":""}>${sn.busy?"Saving…":"Take a snapshot now"}</button></div>
+    ${sn.list.length?Object.entries(byDay).map(([d,l])=>`<div class="tgroup">${dfmt(d)}</div>${l.map(row).join("")}`).join(""):'<div class="muted" style="font-size:12.5px">No snapshots yet. The first one is taken when an agent starts.</div>'}</div>`;
+}
+function viewSettings(){
+  const st=S.st; if(!st) return head("Settings","")+noMission();
+  const sp=st.supervisor||{};
+  return head("Settings","How agents work on this project. Notifications apply to every project.")+`<div class="settings">
+    <div>${accessPanel()}${limitsPanel()}
+      <div class="panel qcard"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div class="label">Models and effort</div><button class="btn sm primary" id="saveModels">Save</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 12px"><b>Effort</b> is how hard the model thinks before answering. Higher is more thorough on hard problems but slower and costlier.</p>
+        ${modelPicker("md-", st.runners, {sr:sp.runner||"claude-supervisor", sm:sp.model||"", se:sp.effort||"", er:st.mission.default_executor||"claude", em:st.mission.executor_model||"", ee:st.mission.executor_effort||""})}</div></div>
+    <div>${snapPanel()}${notifyPanel()}</div></div>`;
 }
 
 
@@ -1139,10 +1231,10 @@ async function refreshLog(){
 
 /* ───────── events ───────── */
 document.addEventListener("click", async e=>{
-  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
+  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
   if(!el) return;
   try{
-    if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(!GLOBAL.has(S.view)){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
+    if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(S.view==="comms") S.chatBottom=true; if(!GLOBAL.has(S.view)){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
     if(el.dataset.ignite){ e.stopPropagation(); el.disabled=true; el.textContent="Igniting…"; const models=$("ig-sr")?readPicker("ig-"):undefined; if(models) lsSet("mc.models",JSON.stringify(models));
       await post("/api/ignite",{p:el.dataset.ignite,models}).catch(()=>{el.disabled=false});
       selectProject(el.dataset.ignite,"comms"); toast("Mission Control ignited. Your supervisor is looking around"); await tick(); return; }
@@ -1164,6 +1256,18 @@ document.addEventListener("click", async e=>{
       await post("/api/remove-project",{p:p.path}); if(S.cur===p.path){ S.cur=null; S.view="overview"; lsSet("mc.view","overview"); } S.hashes={}; toast(`Removed "${p.name}". Its files are untouched`); await tick(); return; }
     if(el.id==="sendChat"){ return sendChat(); }
     if(el.dataset.tact){ await todayAct(el); return; }
+    if(el.id==="jumpChat"){ const c=$("chatlog"); c.scrollTo({top:c.scrollHeight,behavior:"smooth"}); return; }
+    if(el.dataset.rmdom!==undefined||el.id==="addDom"||el.id==="resetDom"){ const a=S.st.access; let d=[...(a.domains||[])];
+      if(el.id==="resetDom") d=[...a.default_domains]; else if(el.id==="addDom"){ const v=(S.drafts.domIn||"").trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\/.*$/,""); if(!v) return toast("Type a site, e.g. example.com",true); d.push(v); S.drafts.domIn=""; }
+      else d=d.filter(x=>x!==el.dataset.rmdom);
+      await post("/api/access",{domains:d}); toast("Saved. Applies from the next agent run"); await tick(); return; }
+    if(el.id==="clearBash"){ for(const r of (S.st.mission.permissions?.allow||[]).filter(r=>r.startsWith("Bash("))) await post("/api/permission",{action:"remove",rule:r}); toast("Old command rules cleared"); await tick(); return; }
+    if(el.dataset.snap){ const r=el.dataset.snap; S.snapOpen=S.snapOpen===r?null:r; render();
+      if(S.snapOpen){ S.snapChanges=S.snapChanges||{}; const res=await api(`/api/snapshot-changes?p=${encodeURIComponent(S.cur)}&ref=${encodeURIComponent(r)}`).catch(e=>{toast(e.message,true); return {changes:[]};}); S.snapChanges={...S.snapChanges,[r]:res.changes}; render(); } return; }
+    if(el.dataset.restore){ const path=el.dataset.path, what=path?`“${path}”`:"every file in this snapshot";
+      if(!confirm(`Put back ${what} as it was in the snapshot? Your current version is snapshotted first, so you can undo this.`)) return;
+      const r=await post("/api/snapshot",{action:"restore",ref:el.dataset.restore,paths:path?[path]:null}); toast(`Restored ${r.restored} file${r.restored===1?"":"s"}`); S.snapChanges={}; S.snapOpen=null; await tick(); return; }
+    if(el.id==="snapNow"){ el.disabled=true; el.textContent="Saving…"; const r=await post("/api/snapshot",{action:"take"}).catch(()=>({})); toast(r.taken?"Snapshot saved":"Nothing changed since the last snapshot"); await tick(); return; }
     if(el.dataset.nsave){ const n=el.dataset.nsave, v=(S.drafts["nf-"+n]||"").trim(); if(!v) return toast("Paste the "+(n==="ntfy"?"topic":"URL")+" first",true);
       S.notify=await post("/api/notify",{channels:{[n]:{[n==="ntfy"?"topic":"url"]:v,on:true}}}); S.drafts["nf-"+n]=""; delete S.hashes.main; toast("Saved"); render(); return; }
     if(el.id==="notifyTest"){ const r=await post("/api/notify-test",{}); const bad=Object.entries(r.results).filter(([,v])=>v!=="ok");
@@ -1222,17 +1326,20 @@ function selectProject(path, view){
   lsSet("mc.view",S.view);
 }
 async function sendChat(){
+  S.chatBottom=true;
   const box=$("chat-box"), v=(box?.value||"").trim(); if(!v) return;
   box.value=""; S.drafts.chat="";
   try{ await post("/api/chat",{text:v}); }catch(err){ box.value=v; S.drafts.chat=v; return; }
   await tick();
 }
-document.addEventListener("keydown", e=>{ if(e.target.id==="permRule" && e.key==="Enter"){ e.preventDefault(); $("addPerm")?.click(); } if(e.target.id==="chat-box" && e.key==="Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); sendChat(); }
+document.addEventListener("keydown", e=>{ if(e.target.id==="permRule" && e.key==="Enter"){ e.preventDefault(); $("addPerm")?.click(); } if(e.target.id==="domIn" && e.key==="Enter"){ e.preventDefault(); $("addDom")?.click(); } if(e.target.id==="chat-box" && e.key==="Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); sendChat(); }
   if(e.target.id==="addPath" && e.key==="Enter"){ e.preventDefault(); $("addBtn")?.click(); }
   if((e.target.id==="t-new"||e.target.id==="r-new") && e.key==="Enter"){ e.preventDefault(); document.querySelector(`[data-tact="${e.target.id==="t-new"?"add":"remind"}"]`)?.click(); } });
-document.addEventListener("input", e=>{ const k=e.target.dataset?.draft; if(k) S.drafts[k]=e.target.value;
+document.addEventListener("input", e=>{ const k=e.target.dataset?.draft; if(k) S.drafts[k]=e.target.value; if(e.target.id==="chat-box") growBox(e.target);
   if(e.target.id==="addPath"){ const was=S._wasRepo, now=looksRepo(e.target.value); S._wasRepo=now; if(was!==now){ delete S.hashes.main; const pos=e.target.selectionStart; render(); const i=$("addPath"); if(i){ i.focus(); i.setSelectionRange(pos,pos); } } } });
 document.addEventListener("change", async e=>{ const t=e.target;
+  if(t.dataset?.access){ await post("/api/access",{mode:t.dataset.access}).catch(()=>{}); toast(t.dataset.access==="sandbox"?"Full access inside the project, sandboxed":"Only allowed commands"); return tick(); }
+  if(t.dataset?.snapon!==undefined){ await post("/api/snapshot",{action:"toggle",on:t.checked}).catch(()=>{}); return tick(); }
   if(t.dataset?.tdone) return todayPost("item",{id:t.dataset.tdone,patch:{done:t.checked}}).catch(()=>{});
   if(t.dataset?.tmove!==undefined){ await todayPost("suggestion",{id:t.dataset.tmove,action:"move",project:t.value||null}).catch(()=>{}); return toast(t.value?"Moved. Emails from this sender will go there from now on":"Moved"); }
   if(t.dataset?.tauto!==undefined) return todayPost("config",{config:{auto:t.checked}}).catch(()=>{});

@@ -194,7 +194,17 @@ def full_state(m: mc.Mission) -> dict:
     return {"mission": m.meta(), "supervisor": sup, "resume_cmd": resume, "watches": mc.watch_list(m) if mc.watches_dir(m).exists() else [], "chat": mc.chat_log(m)[-200:], "path": str(m.root), "tasks": tasks, "questions": [dict(q, perm_info=mc.perm_infos(q["permission"])) if q.get("permission") else q for q in m.questions()],
             "plan_permissions": mc.plan_permission_rules(m) if meta.get("phase") == "awaiting_approval" else [],
             "notes": m.notes()[-50:], "events": m.events()[-300:], "runners": runners,
-            "ready": [t["id"] for t in mc.ready_tasks(m, tasks)], "server_time": mc.now()}
+            "ready": [t["id"] for t in mc.ready_tasks(m, tasks)], "server_time": mc.now(),
+            "access": {"mode": mc.access_mode(m), "chosen": meta.get("access") or "sandbox", "supported": mc.sandbox_supported(),
+                       "domains": mc.net_domains(m), "default_domains": mc.DEFAULT_DOMAINS}}
+
+
+def snapshot_state(m: mc.Mission) -> dict:
+    err = m.dir / "snapshots.git" / "mc-error"
+    return {"on": mc.snapshots_on(m), "available": mc.snapshots.available(), "busy": mc.snapshots.busy(m.root),
+            "list": [{k: s[k] for k in ("ref", "ts", "reason")} for s in mc.snapshots.list_snapshots(m.root)[:200]],
+            "size": mc.snapshots.size_bytes(m.root), "error": err.read_text() if err.exists() else "",
+            "keep_days": mc.snapshots.KEEP_DAYS, "every_min": mc.snapshots.EVERY // 60}
 
 
 def read_log(m: mc.Mission, tid: str, attempt: int, offset: int) -> dict:
@@ -253,6 +263,8 @@ def supervisor_loop() -> None:
                             mc.wake_supervisor(m)
                 if m.meta().get("autopilot"):
                     mc.schedule(m)
+                if mc.snapshots_on(m) and ((sup.get("pid") and mc.pid_alive(sup["pid"])) or any(t["status"] == "running" and not mc.is_human(t) for t in m.tasks())):
+                    mc.snapshots.maybe(m.root, "every 30 minutes while agents work")
             except Exception as e:  # keep the loop alive no matter what
                 print(f"[loop] {path}: {e}", file=sys.stderr)
         time.sleep(2)
@@ -344,6 +356,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, [summary(p, i) for p, i in project_paths().items()])
             if u.path == "/api/state":
                 return self._send(200, full_state(get_mission(q["p"])))
+            if u.path == "/api/snapshots":
+                return self._send(200, snapshot_state(get_mission(q["p"])))
+            if u.path == "/api/snapshot-changes":
+                return self._send(200, {"changes": mc.snapshots.changes(get_mission(q["p"]).root, q["ref"])[:500]})
             if u.path == "/api/log":
                 return self._send(200, read_log(get_mission(q["p"]), q["t"], int(q.get("a", 1)), int(q.get("o", 0))))
             if u.path == "/api/brief":
@@ -519,6 +535,31 @@ class Handler(BaseHTTPRequestHandler):
                 mc.sup_update(m, **kw)
                 if body.get("reset"):
                     mc.chat_add(m, "system", "Supervisor session reset. The next turn starts fresh from the mission state.")
+            elif u.path == "/api/access":
+                meta = m.meta()
+                if body.get("mode") in ("sandbox", "allowlist"):
+                    meta["access"] = body["mode"]
+                    m.event("permission", "user", "agents now have " + ("sandboxed full access to the project" if body["mode"] == "sandbox" else "only the allowed commands"))
+                if isinstance(body.get("domains"), list):
+                    doms = [str(d).strip().lower() for d in body["domains"] if re.fullmatch(r"(\*\.)?[a-z0-9.-]+(:\d+)?", str(d).strip().lower())]
+                    meta["net_domains"] = sorted(set(doms))
+                m.save_meta(meta)
+            elif u.path == "/api/snapshot":
+                act = body.get("action")
+                if act == "toggle":
+                    meta = m.meta()
+                    meta["snapshots"] = bool(body.get("on"))
+                    m.save_meta(meta)
+                elif act == "take":
+                    snap = mc.snapshots.take(m.root, "taken by you")
+                    return self._send(200, {"ok": True, "taken": bool(snap)})
+                elif act == "restore":
+                    paths = body.get("paths") if isinstance(body.get("paths"), list) else None
+                    res = mc.snapshots.restore(m.root, str(body.get("ref")), paths)
+                    m.event("note", "user", f"restored {res['restored']} file(s) from the snapshot of {res['from'].replace('T', ' ')}")
+                    return self._send(200, {"ok": True, **res})
+                else:
+                    return self._send(400, {"error": "unknown snapshot action"})
             elif u.path == "/api/autopilot":
                 meta = m.meta()
                 meta["autopilot"] = bool(body.get("on"))

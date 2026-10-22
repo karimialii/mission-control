@@ -30,6 +30,7 @@ import compat  # noqa: E402
 compat.augment_path()
 import gitops  # noqa: E402
 import notify  # noqa: E402
+import snapshots  # noqa: E402
 
 if __name__ == "__main__":
     compat.ensure_utf8()
@@ -478,14 +479,60 @@ def perm_remove(m: Mission, pattern: str, by: str) -> bool:
     return True
 
 
+# Sandboxed full access: every shell command runs without asking, but inside Claude Code's OS sandbox,
+# which can only write to the working folder and reach the internet domains listed here.
+DEFAULT_DOMAINS = ["pypi.org", "files.pythonhosted.org", "registry.npmjs.org", "github.com", "*.githubusercontent.com"]
+SANDBOX_DENY_READ = ["~/.ssh", "~/.aws", "~/.gnupg", "~/.config/gh", "~/.netrc", "~/.docker", "~/.kube", str(MC_HOME)]
+SANDBOX_TOOLS = "Read,Edit,Write,Glob,Grep,NotebookEdit,TodoWrite,Bash"
+
+
+def sandbox_supported() -> bool:
+    if sys.platform == "darwin":
+        return True
+    return sys.platform.startswith("linux") and bool(shutil.which("bwrap")) and bool(shutil.which("socat"))
+
+
+def snapshots_on(m: Mission) -> bool:
+    return m.meta().get("snapshots", True) is not False and snapshots.available()
+
+
+def access_mode(m: Mission) -> str:
+    """'sandbox' (default where the OS supports it) or 'allowlist' (the older per-command rules)."""
+    want = m.meta().get("access") or "sandbox"
+    return "sandbox" if want == "sandbox" and sandbox_supported() else "allowlist"
+
+
+def net_domains(m: Mission) -> list:
+    meta = m.meta()
+    doms = meta["net_domains"] if isinstance(meta.get("net_domains"), list) else list(DEFAULT_DOMAINS)
+    return doms + [r[7:-1] for r in perm_list(m) if r.startswith("Domain(") and r.endswith(")")]
+
+
+def sandbox_settings(m: Mission) -> str:
+    return json.dumps({"sandbox": {
+        "enabled": True, "autoAllowBashIfSandboxed": True, "allowUnsandboxedCommands": False, "failIfUnavailable": True,
+        "excludedCommands": ["mc", "mc *"],  # Mission Control's own CLI launches executors, so it runs outside
+        "network": {"allowedDomains": sorted(set(net_domains(m)))},
+        "filesystem": {"denyRead": SANDBOX_DENY_READ},
+    }})
+
+
 def apply_permissions(m: Mission, cmd: list) -> list:
-    """Add the project's allowed rules to a headless Claude command (its own settings.json is ignored
-    in folders Claude hasn't been told to trust, so the rules must travel on the command line)."""
-    extra = [x for x in perm_list(m) if perm_valid(x)]
-    if extra and "--allowedTools" in cmd:
-        i = cmd.index("--allowedTools") + 1
-        if i < len(cmd):
-            cmd[i] += "," + ",".join(extra)
+    """Add the project's access to a headless Claude command (its own settings.json is ignored in folders
+    Claude hasn't been told to trust, so everything must travel on the command line)."""
+    extra = [x for x in perm_list(m) if perm_valid(x) and not x.startswith("Domain(")]
+    if "--allowedTools" not in cmd:
+        return cmd
+    i = cmd.index("--allowedTools") + 1
+    if access_mode(m) == "sandbox" and Path(cmd[0]).name in ("claude", "claude.exe"):
+        mine = [x for x in cmd[i].split(",") if x.startswith("Bash(mc")]
+        cmd[i] = ",".join([SANDBOX_TOOLS, *mine, *[x for x in extra if not x.startswith("Bash(")]])
+        if "--disallowedTools" in cmd:  # installs are fine: the sandbox decides where they can write
+            j = cmd.index("--disallowedTools")
+            del cmd[j:j + 2]
+        cmd += ["--settings", sandbox_settings(m)]
+    elif extra and i < len(cmd):
+        cmd[i] += "," + ",".join(extra)
     return cmd
 
 
@@ -1501,6 +1548,12 @@ def cmd_exec(args) -> None:
         log.write(json.dumps({"ts": now(), "kind": kind, "text": text}, ensure_ascii=False) + "\n")
         log.flush()
 
+    if snapshots_on(m):  # agents have full access to the folder, so keep a way back
+        try:
+            snap = snapshots.take(m.root, f"before {tid} attempt {attempt}")
+            write("system", "snapshot of the project taken" if snap else "snapshot: nothing changed since the last one")
+        except Exception as e:
+            write("system", f"snapshot failed: {short(str(e), 200)}")
     write("system", f"attempt {attempt} · {runner.get('label', rname)} · model {model or 'default'} · fresh session")
     proc = subprocess.Popen(cmd, cwd=str(workdir), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             stdin=subprocess.DEVNULL, text=True, bufsize=1,
@@ -1880,6 +1933,11 @@ def run_supervisor_turn(m: Mission, message: str, trigger: str = "") -> dict:
     st = StreamState(runner.get("parser", "claude"))
     t_begin = time.time()
     session_id = None
+    if snapshots_on(m):
+        try:
+            snapshots.take(m.root, "before a supervisor turn")
+        except Exception as e:
+            m.event("error", "system", f"snapshot failed: {short(str(e), 200)}")
     proc = subprocess.Popen(cmd, cwd=str(m.root), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             stdin=subprocess.DEVNULL, text=True, bufsize=1, env=env)
     timer = threading.Timer(int(runner.get("timeout", 1800)), compat.kill_hard, [proc])
