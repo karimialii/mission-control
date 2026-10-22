@@ -461,16 +461,29 @@ def perm_valid(pat: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(\([^,\n]{1,300}\))?", pat.strip()))
 
 
+def perm_outside(m: Mission) -> list:
+    """Commands the user approved while the sandbox was on: they run outside it, with the user's full access."""
+    return list((m.meta().get("permissions") or {}).get("outside") or [])
+
+
 def perm_add(m: Mission, patterns: list, by: str) -> list:
     added = []
+    sandboxed = access_mode(m) == "sandbox"
     with m.lock():
         meta = m.meta()
         allow = meta.setdefault("permissions", {}).setdefault("allow", [])
+        outside = meta["permissions"].setdefault("outside", [])
         for pt in patterns:
             pt = pt.strip()
-            if perm_valid(pt) and pt not in allow:
+            if not perm_valid(pt):
+                continue
+            if pt not in allow:
                 allow.append(pt)
                 added.append(pt)
+            if sandboxed and pt.startswith("Bash(") and pt not in outside:
+                outside.append(pt)  # an approved command must be able to do its job: run it outside the sandbox
+                if pt not in added:
+                    added.append(pt)
         m.save_meta(meta)
     if added:
         m.event("permission", by, "allowed for this project: " + ", ".join(added))
@@ -481,9 +494,12 @@ def perm_remove(m: Mission, pattern: str, by: str) -> bool:
     with m.lock():
         meta = m.meta()
         allow = (meta.get("permissions") or {}).get("allow") or []
-        if pattern not in allow:
+        outside = (meta.get("permissions") or {}).get("outside") or []
+        if pattern not in allow and pattern not in outside:
             return False
-        allow.remove(pattern)
+        for lst in (allow, outside):
+            if pattern in lst:
+                lst.remove(pattern)
         m.save_meta(meta)
     m.event("permission", by, f"no longer allowed: {pattern}")
     return True
@@ -528,7 +544,8 @@ def sandbox_settings(m: Mission) -> str:
         probe.write_text("Mission Control hides this file from sandboxed agents, so `mc` can tell where it runs.\n")
     return json.dumps({"sandbox": {
         "enabled": True, "autoAllowBashIfSandboxed": True, "allowUnsandboxedCommands": False, "failIfUnavailable": True,
-        "excludedCommands": ["mc", "mc *"],  # Mission Control's own CLI launches executors, so it runs outside
+        # Mission Control's own CLI launches executors, and commands the user approved need their real access
+        "excludedCommands": ["mc", "mc *"] + [r[5:-1] for r in perm_outside(m) if r.startswith("Bash(") and r.endswith(")")],
         "network": {"allowedDomains": sorted(set(net_domains(m))), "allowUnixSockets": SANDBOX_TMP},
         "filesystem": {"denyRead": SANDBOX_DENY_READ, "allowWrite": SANDBOX_TMP},
     }})
@@ -631,8 +648,19 @@ def perm_info(rule: str) -> dict:
             "risk": f"Runs `{first or rule}` on your computer. Check that you trust it."}
 
 
-def perm_infos(rules: list) -> list:
-    return [perm_info(r) for r in rules or []]
+OUTSIDE_NOTE = ("Runs outside the sandbox, with your full access: your logins (GitHub, SSH, cloud), every file and any website. "
+                "Run on its own, exactly as approved.")
+
+
+def perm_infos(rules: list, m: Mission | None = None) -> list:
+    out = [perm_info(r) for r in rules or []]
+    if m is not None and access_mode(m) == "sandbox":
+        for x in out:
+            if x["rule"].startswith("Bash("):
+                x["risk"] = OUTSIDE_NOTE + " " + x["risk"]
+                x["level"] = "high" if x["level"] == "high" else "medium"
+                x["outside"] = True
+    return out
 
 
 def plan_permission_rules(m: Mission) -> list:
@@ -1770,7 +1798,7 @@ def state_text(m: Mission) -> str:
 # (resumed turn after turn). It is woken by user chat messages and by executor events.
 
 GATED_PHASES = {"briefing", "awaiting_approval"}
-SUPERVISOR_INTERESTING = {"report", "question", "answer", "error", "approved", "note", "watch"}
+SUPERVISOR_INTERESTING = {"report", "question", "answer", "error", "approved", "note", "watch", "milestone"}
 DASHBOARD_ADDENDUM = """
 
 ## You are running inside the Mission Control dashboard
@@ -3030,7 +3058,20 @@ def cmd_git(a):
     elif a.state == "on":
         git_save(m)({"disabled": False})
         ensure_git(m)
-    print(json.dumps(m.meta().get("git") or {"enabled": False}, indent=2))
+    elif a.state == "follow":
+        if a.value not in ("on", "off"):
+            die("mc git follow on|off")
+        git_save(m)({"follow": a.value == "on"})
+        print(f"your folder {'follows' if a.value == 'on' else 'no longer follows'} the mission's approved work")
+        return
+    elif a.state == "bring":
+        # a merge commit in the user's own branch is their call; the supervisor only fast-forwards
+        okk, msg = gitops.update_folder(m, merge=os.environ.get("MC_ROLE") != "supervisor")
+        if okk:
+            m.event("note", os.environ.get("MC_ROLE") or "user", msg)
+        print(msg)
+        return
+    print(json.dumps({**(m.meta().get("git") or {"enabled": False}), "folder": gitops.folder_status(m)}, indent=2))
 
 
 def cmd_decide(a):
@@ -3545,7 +3586,8 @@ def main(argv=None):
     s.add_argument("--target", help="branch to sync with (default: the remote's default branch)")
     s.add_argument("--check", help="command that must pass afterwards, e.g. \"python3 -m unittest discover -s tests\"")
     s.add_argument("--model", help="model for the task (resolving conflicts is delicate)"); s.set_defaults(fn=cmd_sync_base)
-    s = sub.add_parser("git", help="git mode: status / on / off"); s.add_argument("state", nargs="?", choices=["on", "off", "status"], default="status")
+    s = sub.add_parser("git", help="git mode: status / on / off / bring (approved work into your folder) / follow on|off")
+    s.add_argument("state", nargs="?", choices=["on", "off", "status", "bring", "follow"], default="status"); s.add_argument("value", nargs="?", choices=["on", "off"])
     s.set_defaults(fn=cmd_git)
     s = sub.add_parser("_exec"); s.add_argument("root"); s.add_argument("task"); s.add_argument("attempt")
     s.set_defaults(fn=cmd_exec)
