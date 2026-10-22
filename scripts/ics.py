@@ -288,7 +288,13 @@ def _public(a: datetime, b: datetime, ev: dict) -> dict:
     return {"uid": ev.get("uid", ""), "title": ev.get("title") or "(no title)", "start": a.strftime("%Y-%m-%dT%H:%M"),
             "end": b.strftime("%Y-%m-%dT%H:%M"), "all_day": bool(ev.get("all_day")), "location": (ev.get("location") or "")[:160],
             "join": m.group(0) if m else "", "attendees": ev.get("attendees", 0), "organizer": (ev.get("organizer") or "")[:80],
-            "free": bool(ev.get("free"))}
+            "free": bool(ev.get("free")), "notes": _notes(ev.get("description", ""))}
+
+
+def _notes(text: str) -> str:
+    """The meeting's description without the long join-link boilerplate Teams and Zoom add."""
+    t = re.split(r"_{8,}|-{8,}|Microsoft Teams meeting|Join Zoom Meeting|Join on your computer", text or "", maxsplit=1)[0]
+    return re.sub(r"\n{3,}", "\n\n", t).strip()[:600]
 
 
 _CACHE: dict = {}

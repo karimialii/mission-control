@@ -274,33 +274,40 @@ def calendar_files(cfg: dict | None = None) -> list:
     return files
 
 
-def meetings(days_before: int = 0, days_after: int = 14) -> dict:
-    """{"days": {date: [occurrence]}, "sources": [...]} for the window around today."""
-    events, sources = [], []
-    for f in calendar_files():
+def meetings_range(start, end) -> dict:
+    """{"days": {date: [occurrence]}, "sources": [...]} for dates in [start, end]. Each occurrence
+    carries "cal", the index of the calendar it came from (the page colours by it)."""
+    sources, seen, days = [], set(), {}
+    for idx, f in enumerate(calendar_files()):
+        info = {"path": str(f).replace(str(Path.home()), "~", 1), "dropped": f.parent == DIR / "calendars", "name": f.stem}
         try:
             evs = ics.load(f)
-            events += evs
-            sources.append({"path": str(f).replace(str(Path.home()), "~", 1), "ok": True, "events": len(evs),
-                            "updated": datetime.fromtimestamp(f.stat().st_mtime).strftime("%Y-%m-%dT%H:%M"),
-                            "dropped": f.parent == DIR / "calendars"})
+            info.update(ok=True, events=len(evs), updated=datetime.fromtimestamp(f.stat().st_mtime).strftime("%Y-%m-%dT%H:%M"))
         except (OSError, ValueError) as e:
-            sources.append({"path": str(f), "ok": False, "error": str(e)[:200], "dropped": f.parent == DIR / "calendars"})
-    today = datetime.now().date()
-    seen, days = set(), {}
-    for o in ics.occurrences(events, today - timedelta(days=days_before), today + timedelta(days=days_after + 1)):
-        k = (o["uid"], o["start"])
-        if k in seen:  # the same calendar exported twice
+            sources.append({**info, "ok": False, "error": str(e)[:200]})
             continue
-        seen.add(k)
-        if o["all_day"]:  # an all-day event spanning days shows on each of them
-            d = datetime.fromisoformat(o["start"]).date()
-            while d.isoformat() < o["end"][:10]:
-                days.setdefault(d.isoformat(), []).append(o)
-                d += timedelta(days=1)
-        else:
-            days.setdefault(o["start"][:10], []).append(o)
+        sources.append(info)
+        for o in ics.occurrences(evs, start, end + timedelta(days=1)):
+            k = (o["uid"], o["start"])
+            if k in seen:  # the same calendar exported twice
+                continue
+            seen.add(k)
+            o["cal"] = idx
+            if o["all_day"]:  # an all-day event spanning days shows on each of them
+                d = datetime.fromisoformat(o["start"]).date()
+                while d.isoformat() < o["end"][:10]:
+                    days.setdefault(d.isoformat(), []).append(o)
+                    d += timedelta(days=1)
+            else:
+                days.setdefault(o["start"][:10], []).append(o)
+    for v in days.values():
+        v.sort(key=lambda o: (not o["all_day"], o["start"], o["title"]))
     return {"days": days, "sources": sources}
+
+
+def meetings(days_before: int = 0, days_after: int = 14) -> dict:
+    today = datetime.now().date()
+    return meetings_range(today - timedelta(days=days_before), today + timedelta(days=days_after))
 
 
 _LAST_CAL = [0.0]

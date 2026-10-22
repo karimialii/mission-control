@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 import webbrowser
+from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -350,6 +351,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"clone_dir": str(default_clone_dir()).replace(str(Path.home()), "~", 1)})
             if u.path == "/api/notify":
                 return self._send(200, mc.notify.masked())
+            if u.path == "/api/calendar":
+                a, b = (date.fromisoformat(q[k]) for k in ("from", "to"))
+                if not 0 <= (b - a).days <= 62:
+                    return self._send(400, {"error": "ask for at most two months"})
+                return self._send(200, {**today.meetings_range(a, b), "now": today.now_local()})
             if u.path == "/api/today":
                 return self._send(200, today.state())
             if u.path == "/api/projects":
