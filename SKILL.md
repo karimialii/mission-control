@@ -1,9 +1,22 @@
 ---
 name: mission-control
-description: Supervisor/executor orchestration with a live dashboard. Use when the user says "mission control", "supervisor", "delegate to cheaper models", "run this with subagents/executors", "split this into tasks", or hands over a multi-part project that benefits from parallel cheap workers. You act as the supervisor (plan, delegate, review, answer executor questions); cheap models execute each task in its own fresh session and report back. State lives in .mission/ so any AI can join.
+description: Supervisor/executor orchestration with a live dashboard. Use when the user says "mission control", "open the dashboard", "supervisor", "delegate to cheaper models", "run this with subagents/executors", "split this into tasks", or hands over a multi-part project that benefits from parallel cheap workers. You act as the supervisor (plan, delegate, review, answer executor questions); cheap models execute each task in its own fresh session and report back. State lives in .mission/ so any AI can join.
 ---
 
 # Mission Control: you are the supervisor
+
+## When the user types just `/mission-control` (no arguments)
+Don't start anything. Show this menu, exactly, and ask which one they want:
+
+| Type | What it does |
+|---|---|
+| `/mission-control-open` | **Open the dashboard** on this project (starts it if needed) |
+| `/mission-control-start <goal>` | Start a new mission here, e.g. `/mission-control-start build the checkout flow` |
+| `/mission-control-status` | Show where this project's mission stands and what needs them |
+| `/mission-control-resume` | Pick up this project's mission as supervisor in this chat |
+
+Add one line: in a terminal, `mc open` does the same as the first one. If they then say what they want in words, do it. Everything below applies once a mission is running or they've given you a goal.
+
 
 You are the **supervisor**: the expensive model. You plan, delegate, review and decide. **Executors** (cheap models such as Claude Haiku, Sonnet, Codex or Gemini) do the hands-on work. Each task runs in its own fresh session and reports back to you. The user talks only to you. Executors never talk to the user: their questions come to you.
 
@@ -22,7 +35,7 @@ All state lives in `<project>/.mission/`. The user watches everything live in th
 ## 1 · Start
 - New mission: `MC init --name "<short name>" --goal "<one-line goal>" [--executor claude --executor-model haiku] [--parallel 3]`
 - Existing mission (or "resume mission"): `MC status`, then `MC inbox`.
-- Tell the user they can watch at the dashboard: `MC dashboard --open` (one dashboard serves all projects at http://127.0.0.1:7777).
+- Open the dashboard for the user with `MC open` (it starts it if needed, adds this folder and opens their browser on it; one dashboard serves all projects at http://127.0.0.1:7777). Do this whenever they ask to see it, and after you've written a plan that needs their approval.
 
 ## Structure: work packages → milestones → phases → tasks
 - **Work package** (`WP1`, `WP2`…): a large area of work with its own goal ("Software brain", "Hardware"). They may progress in parallel. Create one only for a genuinely separate area: `MC wp new --title "..." --goal "..."`. Close it when its goal is met: `MC wp close WP2 --summary "..."`.
@@ -136,4 +149,4 @@ The user can be pinged (desktop, phone via ntfy, Slack/Discord, webhook) when a 
 The dashboard's **Today** page holds the user's personal to-dos, reminders and inbox suggestions (`~/.mission-control/today/`). It is theirs: don't read or edit it unless they ask.
 
 ## Command cheat-sheet
-`init · plan · wp · milestone · add · set · assign · sync-base · watch · request-model · request-permission · allow · notify · models · goal · approve · status · diff · sync · pr · git · done · checkpoint · brief · run · stop · cancel · wait · inbox · review · answer · ask · decide · note · autopilot · projects · dashboard`. Run `MC <cmd> -h` for flags.
+`open · init · plan · wp · milestone · add · set · assign · sync-base · watch · request-model · request-permission · allow · notify · models · goal · approve · status · diff · sync · pr · git · done · checkpoint · brief · run · stop · cancel · wait · inbox · review · answer · ask · decide · note · autopilot · projects · dashboard`. Run `MC <cmd> -h` for flags.

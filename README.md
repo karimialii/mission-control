@@ -40,7 +40,33 @@
 [Quick start](#quick-start) · [Tour](#tour) · [Install](#install-once) · [Platforms and agents](#supported-platforms-and-agents) · [Use it in a project](#use-it-in-any-project) · [Models](#choose-your-models-expensive-supervisor-cheap-executors) · [Dashboard](#dashboard-one-for-all-projects) · [Watches](#waiting-for-long-jobs-watches) · [Today](#today-your-start-of-day-page) · [Notifications](#notifications) · [Safety limits](#safety-limits-nothing-loops-nothing-runs-away) · [Permissions](#permissions-sandboxed-full-access) · [Snapshots](#snapshots-undo-anything-an-agent-did) · [Security model](#security-model-read-before-use) · [Teams and git](#teams-git-github-and-teammates) · [Runners](#runners-adding-any-ai) · [Token model](#token-model) · [Files](#files) · [License](#license)
 
 ## Quick start
-**Fastest:** download the repo and run one command. It checks Python, git and which AI CLIs (Claude, Codex, Gemini) you have, picks a sensible default, and opens the dashboard.
+**Install once, then open the dashboard from any project.**
+```bash
+git clone https://github.com/karimialii/mission-control.git
+cd mission-control && bash install.sh
+```
+That adds Mission Control to Claude Code (the skill and its slash commands) and a short `mc` command. Then:
+
+| Where | What to do |
+|---|---|
+| **Terminal** | `cd your-project` then `mc open` |
+| **Inside Claude Code** | type `/mission-control` to see the options, then pick **`/mission-control-open`** |
+
+`mc open` starts the dashboard if it isn't running, adds the folder to it, and opens your browser straight on that project. If the project isn't set up yet, the page offers **🚀 Ignite**. It's safe to run any time: when you've updated Mission Control it restarts the dashboard for you (waiting if agents are working). Add `--no-browser` to just print the address.
+
+The slash commands, each shown with its description when you type `/mission-control`:
+
+| Command | What it does |
+|---|---|
+| `/mission-control` | shows this menu |
+| `/mission-control-open` | **opens the dashboard** on this project |
+| `/mission-control-start <goal>` | starts a new mission here, e.g. `/mission-control-start build the checkout flow` |
+| `/mission-control-status` | shows where this project's mission stands and what needs you |
+| `/mission-control-resume` | picks up this project's mission as supervisor in the chat |
+
+`install.sh` puts `mc` in a folder that's already on your PATH (`~/.local/bin`, `/opt/homebrew/bin`…) and never edits your shell files. If `mc` is taken by another program (Midnight Commander), it installs the command as `mission` instead. Run it again after updating. Windows: `.\install.ps1`, then `mc open` (see [Windows](#windows)).
+
+**No terminal setup:** download the repo and run one command. It checks Python, git and which AI CLIs (Claude, Codex, Gemini) you have, picks a sensible default, and opens the dashboard.
 ```bash
 python3 start.py          # Windows: double-click start.bat, or: python start.py
 ```
@@ -59,7 +85,7 @@ mkdir -p /tmp/mc-demo && cd /tmp/mc-demo
 mc() { python3 "$HOME/.claude/skills/mission-control/scripts/mc.py" "$@"; }
 mc init --name Demo --goal "Try mission control" --executor simulator
 echo '{"tasks":[{"key":"a","title":"Schema"},{"key":"b","title":"Auth [ask]"},{"key":"c","title":"API","deps":["a","b"]}]}' | mc plan -
-mc dashboard --open   # then toggle Autopilot
+mc open   # then toggle Autopilot
 ```
 A task with `[ask]` in its title makes the simulator ask a question. Answer it with `mc answer Q-001 "..."`, and approve finished tasks with `mc review T-001 approve`. The examples below write `mc.py`, which is the same command.
 

@@ -659,8 +659,12 @@ async function post(path, body){
 function toast(msg, err){ const t=$("toast"); t.textContent=msg; t.className="toast on"+(err?" err":""); clearTimeout(t._h); t._h=setTimeout(()=>t.className="toast",2600); }
 
 /* ───────── polling ───────── */
+const OPEN_P = new URLSearchParams(location.search).get("p");   // `mc open` opens the dashboard on a project
 async function loadProjects(){
   S.projects = await api("/api/projects");
+  if(OPEN_P && !S._opened){ S._opened=true; const hit=S.projects.find(p=>p.path===OPEN_P);
+    if(hit){ selectProject(hit.path); if(S.view==="comms"&&hit.initialized&&hit.phase!=="briefing") S.view=lsGet("mc.lastview")||"phases"; }
+    history.replaceState(null,"",location.pathname); }
   if(!S.cur || !S.projects.find(p=>p.path===S.cur)){
     const saved = lsGet("mc.project");
     S.cur = (S.projects.find(p=>p.path===saved) || [...S.projects].sort((a,b)=>b.updated.localeCompare(a.updated))[0] || {}).path || null;

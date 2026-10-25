@@ -30,6 +30,7 @@ if __name__ == "__main__":
 
 UI = mc.SKILL_DIR / "dashboard" / "index.html"
 TOKEN = secrets.token_hex(16)
+STARTED = time.time()  # `mc open` compares this with the installed code to know when to restart
 CHILD_LOCK = threading.Lock()
 
 
@@ -356,6 +357,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"clone_dir": str(default_clone_dir()).replace(str(Path.home()), "~", 1)})
             if u.path == "/api/notify":
                 return self._send(200, mc.notify.masked())
+            if u.path == "/api/info":
+                return self._send(200, {"app": "mission-control", "pid": os.getpid(), "started": STARTED})
             if u.path == "/api/calendar":
                 a, b = (date.fromisoformat(q[k]) for k in ("from", "to"))
                 if not 0 <= (b - a).days <= 62:
