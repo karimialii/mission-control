@@ -433,6 +433,8 @@ code{font-family:var(--mono);font-size:.92em}
 .st-M{color:var(--orange);background:color-mix(in srgb,var(--orange) 14%,transparent)}
 .st-D{color:var(--red);background:color-mix(in srgb,var(--red) 14%,transparent)}
 .st-A{color:var(--green);background:color-mix(in srgb,var(--green) 14%,transparent)}
+/* ── your folder ── */
+.folderb{display:flex;gap:14px;align-items:center;padding:14px 18px;margin-bottom:12px;border-left:4px solid var(--orange)}
 /* ── milestones ── */
 .msbar{background:var(--panel);border-radius:var(--r);box-shadow:var(--shadow);padding:12px 16px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px}
 .msrow{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
@@ -657,8 +659,12 @@ async function post(path, body){
 function toast(msg, err){ const t=$("toast"); t.textContent=msg; t.className="toast on"+(err?" err":""); clearTimeout(t._h); t._h=setTimeout(()=>t.className="toast",2600); }
 
 /* ───────── polling ───────── */
+const OPEN_P = new URLSearchParams(location.search).get("p");   // `mc open` opens the dashboard on a project
 async function loadProjects(){
   S.projects = await api("/api/projects");
+  if(OPEN_P && !S._opened){ S._opened=true; const hit=S.projects.find(p=>p.path===OPEN_P);
+    if(hit){ selectProject(hit.path); if(S.view==="comms"&&hit.initialized&&hit.phase!=="briefing") S.view=lsGet("mc.lastview")||"phases"; }
+    history.replaceState(null,"",location.pathname); }
   if(!S.cur || !S.projects.find(p=>p.path===S.cur)){
     const saved = lsGet("mc.project");
     S.cur = (S.projects.find(p=>p.path===saved) || [...S.projects].sort((a,b)=>b.updated.localeCompare(a.updated))[0] || {}).path || null;
@@ -689,8 +695,8 @@ function changed(key, data){ const h=JSON.stringify(data); if(S.hashes[key]===h)
 function render(){
   renderNav(); renderHeader();
   const v = S.view, cp = S.projects.find(p=>p.path===S.cur), splash = cp && !cp.initialized && !GLOBAL.has(v);
-  const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="phases"||v==="board" ? [S.st?.tasks,S.st?.mission,S.ms,S.st?.plan_permissions,S.cur] : v==="calendar" ? [S.calMode,S.calA,S.calData,S.calEvt?.uid,S.calEvt?.start] : v==="today" ? [S.today, S.calDay, S.calEvt?.uid, S.calEvt?.start, S.projects.map(p=>[p.name,p.needs_you,p.phase,p.counts])] : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
-  if(changed("main", [splash?"ignite":v, S.cur, data, v==="settings"?[S.notify,S.snaps,S.snapOpen,S.snapChanges,S.st?.access,S.st?.mission,S.st?.supervisor]:0])){
+  const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="phases"||v==="board" ? [S.st?.tasks,S.st?.mission,S.ms,S.st?.plan_permissions,S.st?.folder,S.cur] : v==="calendar" ? [S.calMode,S.calA,S.calData,S.calEvt?.uid,S.calEvt?.start] : v==="today" ? [S.today, S.calDay, S.calEvt?.uid, S.calEvt?.start, S.projects.map(p=>[p.name,p.needs_you,p.phase,p.counts])] : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
+  if(changed("main", [splash?"ignite":v, S.cur, data, v==="settings"?[S.st?.folder,S.notify,S.snaps,S.snapOpen,S.snapChanges,S.st?.access,S.st?.mission,S.st?.supervisor]:0])){
     const act = document.activeElement, aid = act && act.id, sel = act && act.selectionStart;
     const cl=$("chatlog"), stick=!cl || S.chatBottom || cl.scrollTop+cl.clientHeight>=cl.scrollHeight-60, clTop=cl?.scrollTop||0, sideTop=document.querySelector(".side")?.scrollTop||0, doneTop=document.querySelector(".tdone")?.scrollTop||0, calTop=$("calScroll")?.scrollTop, qsTop=$("qscroll")?.scrollTop||0;
     $("main").innerHTML = `<div class="wrap">${splash ? viewIgnite(cp) : (VIEW_FN[v]||viewPhases)()}</div>`;
@@ -794,6 +800,23 @@ function schedule(tasks){
   while(cur.length){ const nx=[]; cur.forEach(id=>{ if(crit.has(id)) return; crit.add(id); (by[id].depends_on||[]).forEach(d=>{ if(by[d]&&end[d]===start[id]) nx.push(d); }); }); cur=nx; }
   return {start,end,total,crit};
 }
+/* ── your project folder follows the mission ── */
+function folderBanner(){
+  const f=S.st?.folder; if(!f?.enabled||!f.behind) return "";
+  const n=f.behind, what=`${n} approved change${n===1?"":"s"} ${n===1?"isn't":"aren't"} in your project folder yet`;
+  const files=(f.files||[]).slice(0,6).map(x=>`<code>${esc(x)}</code>`).join(" ")+((f.files||[]).length>6?` and ${(f.files||[]).length-6} more`:"");
+  const can=f.state==="fast-forward"||f.needs_merge;
+  return `<div class="panel folderb"><div style="min-width:0;flex:1"><div style="font-weight:600;font-size:14px">${what}</div>
+    <div class="muted" style="font-size:12.5px;margin-top:3px">${f.state==="fast-forward"?(f.follow?"They'll appear on their own after the next approval, or bring them in now.":"Following is off for this project."):esc(f.reason||"")}${f.dirty?". Commit or stash them, then try again.":""}</div>
+    ${files?`<div style="font-size:12px;margin-top:6px;overflow-wrap:anywhere">${files}</div>`:""}</div>
+    <button class="btn sm ${can?"primary":""}" id="bringIn" ${can?"":"disabled"} title="${f.needs_merge?"Merges the mission branch into "+esc(f.branch):"Fast-forwards "+esc(f.branch||"")+" to the mission branch"}">Bring them in</button></div>`;
+}
+function folderPanel(){
+  const f=S.st?.folder; if(!f?.enabled) return "";
+  return `<div class="panel qcard"><div style="display:flex;justify-content:space-between;align-items:center"><div class="label">Your project folder</div><input type="checkbox" data-follow ${f.follow?"checked":""} aria-label="Keep my folder up to date"></div>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 8px">Agents work on the branch <code>${esc(f.mission)}</code> in a hidden copy, so your folder isn't touched while they work. When this is on, every approved task is brought into your folder (<code>${esc(f.base||"")}</code>) right away, as long as that's a plain fast-forward: nothing of yours is ever overwritten. Pushing to GitHub stays separate.</p>
+    <div style="font-size:13px">${f.behind?`<span style="color:var(--orange)">${f.behind} change${f.behind===1?"":"s"} waiting</span>${f.reason?` · <span class="muted">${esc(f.reason)}</span>`:""}`:'<span style="color:var(--green)">✓ Your folder has all approved work</span>'}</div></div>`;
+}
 /* ── work packages and milestones ── */
 const MS_LABEL={planning:"Planning",awaiting_approval:"Awaiting approval",executing:"Running",review:"In review",done:"Done"};
 const MS_ICON={planning:"○",awaiting_approval:"◔",executing:"▶",review:"◎",done:"✓"};
@@ -867,7 +890,7 @@ function viewPhases(){
     return `<div class="panel phase-chip"><div class="label">Phase ${l+1}</div><div style="display:flex;align-items:baseline;gap:8px;margin-top:2px"><span class="n">${d}/${ts_.length}</span><span class="muted" style="font-size:12px">done</span></div><div class="bar"><i style="width:${d/ts_.length*100}%;background:var(--green)"></i></div></div>`; }).join("");
   return head("Timeline", "Tasks that can run in parallel start together. Dependent tasks start after the tasks they wait for.",
       `<div class="gstats"><span class="tag">${tasks.length} tasks</span><span class="tag">${levels.length} phases</span><span class="tag">up to ${maxPar} in parallel</span><span class="tag" style="color:var(--crit)">critical path: ${crit.size} tasks</span></div>`)
-    + approveBanner() + prBanner() + msBar(st) + `<div class="phase-strip">${strip}</div><div class="panel gantt-wrap">${svg}</div>
+    + approveBanner() + prBanner() + folderBanner() + msBar(st) + `<div class="phase-strip">${strip}</div><div class="panel gantt-wrap">${svg}</div>
     <div class="legend">${STATUS.map(s=>`<span><i style="background:${SCOL(s)}"></i>${SLABEL[s]}</span>`).join("")}<span><i style="background:var(--crit)"></i>Critical path</span><span>Columns are estimate points</span></div>`;
 }
 const cssCache={}; function getCss(v){ return cssCache[v] ??= (getComputedStyle(document.documentElement).getPropertyValue(v).trim().startsWith("var(") ? getCss(getComputedStyle(document.documentElement).getPropertyValue(v).trim().slice(4,-1)) : getComputedStyle(document.documentElement).getPropertyValue(v).trim()); }
@@ -878,7 +901,7 @@ function viewBoard(){
   const st=S.st; if(!st) return head("Board","")+noMission();
   const deps = t => (t.depends_on||[]).filter(d=>st.tasks.find(x=>x.id===d)?.status!=="done");
   const bt=msTasks(st,true);
-  return head("Board", "Every task by status. Open a card for its live transcript, report and tokens.") + msBar(st,true) + `<div class="board">` + STATUS.map(s=>{
+  return head("Board", "Every task by status. Open a card for its live transcript, report and tokens.") + folderBanner() + msBar(st,true) + `<div class="board">` + STATUS.map(s=>{
     const items=bt.filter(t=>t.status===s);
     return `<div class="panel col"><div class="col-h"><b><i class="cdot" style="background:${SCOL(s)}"></i>${SLABEL[s]}</b><span>${items.length}</span></div>` + items.map(t=>{
       const waiting=deps(t), ready=st.ready.includes(t.id);
@@ -1018,7 +1041,7 @@ function supLabel(){ const sp=S.st.supervisor||{}, r=S.st.runners[sp.runner||"cl
 function riskPill(l){ return `<span class="risk ${l}">${l==="low"?"Low":l==="high"?"High":"Medium"} risk</span>`; }
 function permRows(list,checks){
   return `<div class="pc-list">${list.map(p=>`<div class="pr"><div class="pr-top"><label>${checks?`<input type="checkbox" class="pp-chk" data-rule="${esc(p.rule)}" checked>`:""}${esc(p.label)}</label>${riskPill(p.level)}</div>
-    <code>${esc(p.rule)}</code>${p.why?`<div class="muted" style="font-size:12px">${esc(p.why)}</div>`:""}<div class="pr-risk">${esc(p.risk)}</div></div>`).join("")}</div>`;
+    <code>${esc(p.rule)}</code>${p.why?`<div class="muted" style="font-size:12px">${esc(p.why)}</div>`:""}${p.outside?`<div class="pr-risk" style="color:var(--orange);font-weight:600">⚠ Runs outside the sandbox</div>`:""}<div class="pr-risk">${esc(p.risk)}</div></div>`).join("")}</div>`;
 }
 function approveBanner(){
   const st=S.st; if(!st) return "";
@@ -1366,8 +1389,8 @@ function viewComms(){
 }
 /* ── settings (per project, plus global notifications) ── */
 function accessPanel(){
-  const a=S.st.access||{}, allow=S.st.mission.permissions?.allow||[], sb=a.mode==="sandbox";
-  const bashRules=allow.filter(r=>r.startsWith("Bash(")), other=allow.filter(r=>!r.startsWith("Bash(")&&!r.startsWith("Domain("));
+  const a=S.st.access||{}, allow=S.st.mission.permissions?.allow||[], outside=S.st.mission.permissions?.outside||[], sb=a.mode==="sandbox";
+  const bashRules=allow.filter(r=>r.startsWith("Bash(")&&!outside.includes(r)), other=allow.filter(r=>!r.startsWith("Bash(")&&!r.startsWith("Domain("));
   const opt=(v,t,d)=>`<label class="mode ${(a.chosen||"sandbox")===v?"on":""}"><input type="radio" name="acc" data-access="${v}" ${(a.chosen||"sandbox")===v?"checked":""} ${v==="sandbox"&&!a.supported?"disabled":""}><div><b>${t}</b><div class="muted" style="font-size:12.5px;margin-top:2px">${d}</div></div></label>`;
   return `<div class="panel qcard"><div class="label">What agents can do</div>
     ${opt("sandbox","Full access inside the project (recommended)","The supervisor and executors run any command without asking. The operating system keeps them inside this project folder: they can't write anywhere else, can't read your keys (SSH, cloud, GitHub logins) and only reach the internet sites listed below. Snapshots let you undo anything.")}
@@ -1376,10 +1399,13 @@ function accessPanel(){
     ${sb?`<div class="label" style="margin-top:14px">Internet sites agents can reach</div>
       <div class="rules">${(a.domains||[]).map(d=>`<span class="rule"><code>${esc(d)}</code><button class="x2" data-rmdom="${esc(d)}" aria-label="Remove ${esc(d)}">×</button></span>`).join("")||'<span class="muted" style="font-size:12.5px">None: agents are offline.</span>'}</div>
       <div style="display:flex;gap:8px;margin-top:8px"><input class="inp" id="domIn" data-draft="domIn" placeholder="example.com  or  *.example.com" value="${esc(S.drafts.domIn||"")}"><button class="btn sm primary" id="addDom">Add</button><button class="btn sm" id="resetDom" title="Back to: ${esc((a.default_domains||[]).join(", "))}">Defaults</button></div>`:""}
+    ${sb&&outside.length?`<div class="label" style="margin-top:14px">Approved to run outside the sandbox</div>
+      <p class="muted" style="font-size:12px;margin:4px 0 6px">Exactly these commands run with your full access (your logins, all files, any website), because you approved them. Everything else stays inside.</p>
+      <div class="rules">${outside.map(r=>`<span class="rule"><code>${esc(r)}</code><button class="x2" data-rmperm="${esc(r)}" aria-label="Remove ${esc(r)}">×</button></span>`).join("")}</div>`:""}
     ${other.length||!sb?`<div class="label" style="margin-top:14px">${sb?"Extra tools":"Allowed commands"}</div>
       <div class="rules">${(sb?other:allow).map(r=>`<span class="rule"><code>${esc(r)}</code><button class="x2" data-rmperm="${esc(r)}" aria-label="Remove ${esc(r)}">×</button></span>`).join("")||'<span class="muted" style="font-size:12.5px">Only the defaults.</span>'}</div>`:""}
-    <div style="display:flex;gap:8px;margin-top:8px"><input class="inp" id="permRule" data-draft="permRule" placeholder="${sb?"WebSearch  or  WebFetch":"Bash(~/venvs/env/bin/python *)  or  WebSearch"}" value="${esc(S.drafts.permRule||"")}"><button class="btn sm" id="addPerm">Allow</button></div>
-    ${sb&&bashRules.length?`<div class="muted" style="font-size:12.5px;margin-top:12px;display:flex;justify-content:space-between;gap:10px;align-items:center"><span>${bashRules.length} command rule${bashRules.length===1?"":"s"} from the old mode aren't needed any more.</span><button class="btn sm" id="clearBash">Clear them</button></div>`:""}</div>`;
+    <div style="display:flex;gap:8px;margin-top:8px"><input class="inp" id="permRule" data-draft="permRule" placeholder="${sb?"WebSearch  or  Bash(gh repo create *) to run outside":"Bash(~/venvs/env/bin/python *)  or  WebSearch"}" value="${esc(S.drafts.permRule||"")}"><button class="btn sm" id="addPerm">Allow</button></div>
+    ${sb&&bashRules.length?`<div class="muted" style="font-size:12.5px;margin-top:12px;display:flex;justify-content:space-between;gap:10px;align-items:center"><span>${bashRules.length} command rule${bashRules.length===1?"":"s"} from the old mode aren't needed any more (they don't let anything out of the sandbox).</span><button class="btn sm" id="clearBash">Clear them</button></div>`:""}</div>`;
 }
 function snapPanel(){
   const sn=S.snaps; if(!sn) return `<div class="panel qcard"><div class="label">Snapshots</div><div class="muted" style="font-size:12.5px">Loading…</div></div>`;
@@ -1407,7 +1433,7 @@ function viewSettings(){
       <div class="panel qcard"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div class="label">Models and effort</div><button class="btn sm primary" id="saveModels">Save</button></div>
         <p class="muted" style="font-size:12.5px;margin:0 0 12px"><b>Effort</b> is how hard the model thinks before answering. Higher is more thorough on hard problems but slower and costlier.</p>
         ${modelPicker("md-", st.runners, {sr:sp.runner||"claude-supervisor", sm:sp.model||"", se:sp.effort||"", er:st.mission.default_executor||"claude", em:st.mission.executor_model||"", ee:st.mission.executor_effort||""})}</div></div>
-    <div>${snapPanel()}${notifyPanel()}</div></div>`;
+    <div>${folderPanel()}${snapPanel()}${notifyPanel()}</div></div>`;
 }
 
 
@@ -1534,7 +1560,7 @@ async function refreshLog(){
 
 /* ───────── events ───────── */
 document.addEventListener("click", async e=>{
-  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-ms],[data-calday],[data-calmode],[data-calnav],[data-calgo],[data-calday-go],[data-ev],[data-evclose],[data-evtodo],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
+  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-ms],#bringIn,[data-calday],[data-calmode],[data-calnav],[data-calgo],[data-calday-go],[data-ev],[data-evclose],[data-evtodo],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
   if(!el) return;
   try{
     if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(S.view==="comms") S.chatBottom=true; if(!GLOBAL.has(S.view)){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
@@ -1559,6 +1585,7 @@ document.addEventListener("click", async e=>{
       await post("/api/remove-project",{p:p.path}); if(S.cur===p.path){ S.cur=null; S.view="overview"; lsSet("mc.view","overview"); } S.hashes={}; toast(`Removed "${p.name}". Its files are untouched`); await tick(); return; }
     if(el.id==="sendChat"){ return sendChat(); }
     if(el.dataset.tact){ await todayAct(el); return; }
+    if(el.id==="bringIn"){ el.disabled=true; el.textContent="Bringing in…"; const r=await post("/api/folder",{bring:true}).catch(e=>({ok:false,message:e.message})); toast(r.message||"Done",!r.ok); await tick(); return; }
     if(el.dataset.ms){ S.ms=el.dataset.ms; delete S.hashes.main; render(); return; }
     if(el.dataset.ev){ if(e.target.closest("a[href]")) return; const o=findEv(el.dataset.ev); if(o){ S.calEvt=o; delete S.hashes.main; render(); } return; }
     if(el.dataset.evclose!==undefined){ S.calEvt=null; delete S.hashes.main; render(); return; }
@@ -1657,6 +1684,7 @@ document.addEventListener("input", e=>{ const k=e.target.dataset?.draft; if(k) S
   if(e.target.id==="addPath"){ const was=S._wasRepo, now=looksRepo(e.target.value); S._wasRepo=now; if(was!==now){ delete S.hashes.main; const pos=e.target.selectionStart; render(); const i=$("addPath"); if(i){ i.focus(); i.setSelectionRange(pos,pos); } } } });
 document.addEventListener("change", async e=>{ const t=e.target;
   if(t.dataset?.access){ await post("/api/access",{mode:t.dataset.access}).catch(()=>{}); toast(t.dataset.access==="sandbox"?"Full access inside the project, sandboxed":"Only allowed commands"); return tick(); }
+  if(t.dataset?.follow!==undefined){ await post("/api/folder",{follow:t.checked}).catch(()=>{}); toast(t.checked?"Your folder follows approved work":"Your folder no longer follows the mission"); return tick(); }
   if(t.dataset?.snapon!==undefined){ await post("/api/snapshot",{action:"toggle",on:t.checked}).catch(()=>{}); return tick(); }
   if(t.dataset?.tdone) return todayPost("item",{id:t.dataset.tdone,patch:{done:t.checked}}).catch(()=>{});
   if(t.dataset?.tmove!==undefined){ await todayPost("suggestion",{id:t.dataset.tmove,action:"move",project:t.value||null}).catch(()=>{}); return toast(t.value?"Moved. Emails from this sender will go there from now on":"Moved"); }

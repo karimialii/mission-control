@@ -40,7 +40,33 @@
 [Quick start](#quick-start) · [Tour](#tour) · [Install](#install-once) · [Platforms and agents](#supported-platforms-and-agents) · [Use it in a project](#use-it-in-any-project) · [Models](#choose-your-models-expensive-supervisor-cheap-executors) · [Dashboard](#dashboard-one-for-all-projects) · [Watches](#waiting-for-long-jobs-watches) · [Today](#today-your-start-of-day-page) · [Notifications](#notifications) · [Safety limits](#safety-limits-nothing-loops-nothing-runs-away) · [Permissions](#permissions-sandboxed-full-access) · [Snapshots](#snapshots-undo-anything-an-agent-did) · [Security model](#security-model-read-before-use) · [Teams and git](#teams-git-github-and-teammates) · [Runners](#runners-adding-any-ai) · [Token model](#token-model) · [Files](#files) · [License](#license)
 
 ## Quick start
-**Fastest:** download the repo and run one command. It checks Python, git and which AI CLIs (Claude, Codex, Gemini) you have, picks a sensible default, and opens the dashboard.
+**Install once, then open the dashboard from any project.**
+```bash
+git clone https://github.com/karimialii/mission-control.git
+cd mission-control && bash install.sh
+```
+That adds Mission Control to Claude Code (the skill and its slash commands) and a short `mc` command. Then:
+
+| Where | What to do |
+|---|---|
+| **Terminal** | `cd your-project` then `mc open` |
+| **Inside Claude Code** | type `/mission-control` to see the options, then pick **`/mission-control-open`** |
+
+`mc open` starts the dashboard if it isn't running, adds the folder to it, and opens your browser straight on that project. If the project isn't set up yet, the page offers **🚀 Ignite**. It's safe to run any time: when you've updated Mission Control it restarts the dashboard for you (waiting if agents are working). Add `--no-browser` to just print the address.
+
+The slash commands, each shown with its description when you type `/mission-control`:
+
+| Command | What it does |
+|---|---|
+| `/mission-control` | shows this menu |
+| `/mission-control-open` | **opens the dashboard** on this project |
+| `/mission-control-start <goal>` | starts a new mission here, e.g. `/mission-control-start build the checkout flow` |
+| `/mission-control-status` | shows where this project's mission stands and what needs you |
+| `/mission-control-resume` | picks up this project's mission as supervisor in the chat |
+
+`install.sh` puts `mc` in a folder that's already on your PATH (`~/.local/bin`, `/opt/homebrew/bin`…) and never edits your shell files. If `mc` is taken by another program (Midnight Commander), it installs the command as `mission` instead. Run it again after updating. Windows: `.\install.ps1`, then `mc open` (see [Windows](#windows)).
+
+**No terminal setup:** download the repo and run one command. It checks Python, git and which AI CLIs (Claude, Codex, Gemini) you have, picks a sensible default, and opens the dashboard.
 ```bash
 python3 start.py          # Windows: double-click start.bat, or: python start.py
 ```
@@ -59,7 +85,7 @@ mkdir -p /tmp/mc-demo && cd /tmp/mc-demo
 mc() { python3 "$HOME/.claude/skills/mission-control/scripts/mc.py" "$@"; }
 mc init --name Demo --goal "Try mission control" --executor simulator
 echo '{"tasks":[{"key":"a","title":"Schema"},{"key":"b","title":"Auth [ask]"},{"key":"c","title":"API","deps":["a","b"]}]}' | mc plan -
-mc dashboard --open   # then toggle Autopilot
+mc open   # then toggle Autopilot
 ```
 A task with `[ask]` in its title makes the simulator ask a question. Answer it with `mc answer Q-001 "..."`, and approve finished tasks with `mc review T-001 approve`. The examples below write `mc.py`, which is the same command.
 
@@ -281,7 +307,8 @@ By default the supervisor and executors (Claude) have **full access inside the p
 - **Your keys are hidden:** `~/.ssh`, `~/.aws`, `~/.gnupg`, GitHub CLI logins, `~/.netrc`, Docker and Kubernetes configs, and your private Mission Control data (Today page, notification settings).
 - **Internet** is limited to a list of sites, by default package registries and GitHub (`pypi.org`, `files.pythonhosted.org`, `registry.npmjs.org`, `github.com`, `*.githubusercontent.com`). Edit it per project in **Settings → What agents can do**. When an agent needs another site, the supervisor asks you (a `Domain(example.com)` request with **Allow** / **Don't allow**).
 - `/tmp` is writable and Unix sockets under `/tmp` are allowed, for test servers that need short socket paths.
-- There is no "run it outside the sandbox" escape hatch. Only Mission Control's own `mc` command runs outside it, so the supervisor can launch executors. When it runs `mc` inside the sandbox (in a pipeline, say), runs and notifications are handed to the dashboard, which carries them out.
+- **Commands you approve run outside the sandbox.** When an agent needs your own access (your GitHub login for `gh repo create`, `git push`, a deploy), the supervisor asks for that exact command. Once you approve it, exactly that command runs with your full access, and the card says so. Everything else stays inside. They're listed under **Settings → What agents can do**, where × takes one back. The command must be run on its own: anything added to it (a pipe, `2>&1`, `cd … &&`) keeps it sandboxed.
+- Apart from that, there is no "run it outside the sandbox" escape hatch. Only Mission Control's own `mc` command runs outside it, so the supervisor can launch executors. When it runs `mc` inside the sandbox (in a pipeline, say), runs and notifications are handed to the dashboard, which carries them out.
 
 The sandbox works on macOS out of the box and on Linux/WSL2 with `bubblewrap` and `socat` installed. Where it isn't available, Mission Control falls back to **only allowed commands**, the older mode where each kind of command is allowed one by one (you can also choose that mode in Settings). Codex uses its own `workspace-write` sandbox; Gemini needs an approval mode you choose.
 
@@ -312,7 +339,7 @@ Hover a project in the sidebar and press ×, or use **Remove** on its card in Al
 ## Teams: git, GitHub and teammates
 Missions are safe to run in a shared repository:
 
-- **Your checkout is never touched.** When work starts in a git repo, Mission Control creates `mission/<name>` from the latest `origin/<your branch>`, in a separate worktree (`.mission/worktrees/_mission`). `.mission/` is excluded locally through `.git/info/exclude`, so the shared `.gitignore` is unchanged.
+- **Your folder isn't touched while agents work, and approved work arrives in it.** When work starts in a git repo, Mission Control creates `mission/<name>` from the latest `origin/<your branch>`, in a separate worktree (`.mission/worktrees/_mission`). Each time a task is approved, your own folder is fast-forwarded to the mission branch, so files you asked for (a shopping list, a report, code) appear where you expect them. It only fast-forwards: if you have uncommitted changes, are on another branch, committed something yourself, or have an untracked file in the way, it waits, and Timeline and Board show what's waiting with a **Bring them in** button (a normal merge, stopped cleanly on conflicts). Switch it off in **Settings → Your project folder**, or `mc git follow off`. `.mission/` is excluded locally through `.git/info/exclude`, so the shared `.gitignore` is unchanged.
 - **Each AI task works in its own worktree and branch.** Approval merges the task into the mission branch. Conflicts go back to the executor, and unresolved conflict markers are never committed.
 - **You can assign tasks to people.** In a task's sheet, choose **Assign to a person…**, or use `"assignee": "sara"` in the plan, or `mc.py assign T-004 --to sara`. Pressing **Hand Off**:
   - pushes a task branch and opens a GitHub issue with the full brief, assigned to them;

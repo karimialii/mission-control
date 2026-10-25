@@ -461,16 +461,29 @@ def perm_valid(pat: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(\([^,\n]{1,300}\))?", pat.strip()))
 
 
+def perm_outside(m: Mission) -> list:
+    """Commands the user approved while the sandbox was on: they run outside it, with the user's full access."""
+    return list((m.meta().get("permissions") or {}).get("outside") or [])
+
+
 def perm_add(m: Mission, patterns: list, by: str) -> list:
     added = []
+    sandboxed = access_mode(m) == "sandbox"
     with m.lock():
         meta = m.meta()
         allow = meta.setdefault("permissions", {}).setdefault("allow", [])
+        outside = meta["permissions"].setdefault("outside", [])
         for pt in patterns:
             pt = pt.strip()
-            if perm_valid(pt) and pt not in allow:
+            if not perm_valid(pt):
+                continue
+            if pt not in allow:
                 allow.append(pt)
                 added.append(pt)
+            if sandboxed and pt.startswith("Bash(") and pt not in outside:
+                outside.append(pt)  # an approved command must be able to do its job: run it outside the sandbox
+                if pt not in added:
+                    added.append(pt)
         m.save_meta(meta)
     if added:
         m.event("permission", by, "allowed for this project: " + ", ".join(added))
@@ -481,9 +494,12 @@ def perm_remove(m: Mission, pattern: str, by: str) -> bool:
     with m.lock():
         meta = m.meta()
         allow = (meta.get("permissions") or {}).get("allow") or []
-        if pattern not in allow:
+        outside = (meta.get("permissions") or {}).get("outside") or []
+        if pattern not in allow and pattern not in outside:
             return False
-        allow.remove(pattern)
+        for lst in (allow, outside):
+            if pattern in lst:
+                lst.remove(pattern)
         m.save_meta(meta)
     m.event("permission", by, f"no longer allowed: {pattern}")
     return True
@@ -528,7 +544,8 @@ def sandbox_settings(m: Mission) -> str:
         probe.write_text("Mission Control hides this file from sandboxed agents, so `mc` can tell where it runs.\n")
     return json.dumps({"sandbox": {
         "enabled": True, "autoAllowBashIfSandboxed": True, "allowUnsandboxedCommands": False, "failIfUnavailable": True,
-        "excludedCommands": ["mc", "mc *"],  # Mission Control's own CLI launches executors, so it runs outside
+        # Mission Control's own CLI launches executors, and commands the user approved need their real access
+        "excludedCommands": ["mc", "mc *"] + [r[5:-1] for r in perm_outside(m) if r.startswith("Bash(") and r.endswith(")")],
         "network": {"allowedDomains": sorted(set(net_domains(m))), "allowUnixSockets": SANDBOX_TMP},
         "filesystem": {"denyRead": SANDBOX_DENY_READ, "allowWrite": SANDBOX_TMP},
     }})
@@ -631,8 +648,19 @@ def perm_info(rule: str) -> dict:
             "risk": f"Runs `{first or rule}` on your computer. Check that you trust it."}
 
 
-def perm_infos(rules: list) -> list:
-    return [perm_info(r) for r in rules or []]
+OUTSIDE_NOTE = ("Runs outside the sandbox, with your full access: your logins (GitHub, SSH, cloud), every file and any website. "
+                "Run on its own, exactly as approved.")
+
+
+def perm_infos(rules: list, m: Mission | None = None) -> list:
+    out = [perm_info(r) for r in rules or []]
+    if m is not None and access_mode(m) == "sandbox":
+        for x in out:
+            if x["rule"].startswith("Bash("):
+                x["risk"] = OUTSIDE_NOTE + " " + x["risk"]
+                x["level"] = "high" if x["level"] == "high" else "medium"
+                x["outside"] = True
+    return out
 
 
 def plan_permission_rules(m: Mission) -> list:
@@ -1770,7 +1798,7 @@ def state_text(m: Mission) -> str:
 # (resumed turn after turn). It is woken by user chat messages and by executor events.
 
 GATED_PHASES = {"briefing", "awaiting_approval"}
-SUPERVISOR_INTERESTING = {"report", "question", "answer", "error", "approved", "note", "watch"}
+SUPERVISOR_INTERESTING = {"report", "question", "answer", "error", "approved", "note", "watch", "milestone"}
 DASHBOARD_ADDENDUM = """
 
 ## You are running inside the Mission Control dashboard
@@ -2477,7 +2505,17 @@ def cmd_set(a):
     m.event("task_updated", "supervisor", f"{a.task} updated: {', '.join(a.pairs)}", task=a.task)
 
 
+def no_mission_here(a) -> bool:
+    """With --soft, a folder without a mission is an answer, not an error (used by the slash commands)."""
+    if getattr(a, "soft", False) and not find_root():
+        print("No mission in this folder yet. Start one with /mission-control-start <your goal>, or open the dashboard with /mission-control-open.")
+        return True
+    return False
+
+
 def cmd_status(a):
+    if no_mission_here(a):
+        return
     m = need_mission()
     if a.json:
         print(json.dumps({"mission": m.meta(), "tasks": m.tasks()}, indent=2))
@@ -3030,7 +3068,20 @@ def cmd_git(a):
     elif a.state == "on":
         git_save(m)({"disabled": False})
         ensure_git(m)
-    print(json.dumps(m.meta().get("git") or {"enabled": False}, indent=2))
+    elif a.state == "follow":
+        if a.value not in ("on", "off"):
+            die("mc git follow on|off")
+        git_save(m)({"follow": a.value == "on"})
+        print(f"your folder {'follows' if a.value == 'on' else 'no longer follows'} the mission's approved work")
+        return
+    elif a.state == "bring":
+        # a merge commit in the user's own branch is their call; the supervisor only fast-forwards
+        okk, msg = gitops.update_folder(m, merge=os.environ.get("MC_ROLE") != "supervisor")
+        if okk:
+            m.event("note", os.environ.get("MC_ROLE") or "user", msg)
+        print(msg)
+        return
+    print(json.dumps({**(m.meta().get("git") or {"enabled": False}), "folder": gitops.folder_status(m)}, indent=2))
 
 
 def cmd_decide(a):
@@ -3097,6 +3148,8 @@ def inbox_items(m: Mission, mark_read: bool) -> list:
 
 
 def cmd_inbox(a):
+    if no_mission_here(a):
+        return
     m = need_mission()
     items = inbox_items(m, mark_read=not a.peek)
     print("\n".join(items) if items else "inbox empty")
@@ -3397,6 +3450,127 @@ def cmd_models(a):
     print("available:  " + ", ".join(f"{k} [{r.get('role', 'executor')}] {'/'.join(r.get('models', []))}" for k, r in runners.items()))
 
 
+# ───────────────────────────── `mc open`: the one command to get to the dashboard ─────────────────────────────
+
+def project_root_for(start=None) -> Path:
+    """The folder `mc open` means: the nearest mission, else the git repository's top, else the folder itself."""
+    p = Path(start or os.getcwd()).expanduser().resolve()
+    found = find_root(p)
+    if found:
+        return found
+    for d in [p, *p.parents]:
+        if (d / ".git").exists():
+            return d
+    return p
+
+
+def dashboard_info(port: int) -> dict | None:
+    """What the dashboard on this port says about itself, or None if nothing answers or it isn't ours."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/info", timeout=2) as r:
+            info = json.loads(r.read().decode())
+        return info if info.get("app") == "mission-control" else {"app": "other"}
+    except urllib.error.HTTPError:
+        try:  # answers, but is an older dashboard without /api/info
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=2) as r:
+                if "Mission Control" not in r.read(4000).decode("utf-8", "replace"):
+                    return {"app": "other"}  # some other web server owns the port
+                return {"app": "mission-control", "started": 0, "old": True}
+        except Exception:
+            return None
+    except Exception:
+        return None
+
+
+def newest_code_time() -> float:
+    files = [*HERE.glob("*.py"), SKILL_DIR / "dashboard" / "index.html", SKILL_DIR / "runners.default.json"]
+    return max((f.stat().st_mtime for f in files if f.exists()), default=0.0)
+
+
+def agents_working() -> list:
+    """Names of projects with an executor or supervisor running right now."""
+    busy = []
+    for row in registry():
+        m = Mission(row.get("path", ""))
+        if not m.meta():
+            continue
+        sup = (m.meta().get("supervisor") or {})
+        working = (sup.get("running") and pid_alive(sup.get("pid"))) or any(
+            t["status"] == "running" and not is_human(t) and pid_alive((t.get("run") or {}).get("pid")) for t in m.tasks())
+        if working:
+            busy.append(row.get("name") or Path(row["path"]).name)
+    return busy
+
+
+def start_dashboard(port: int) -> None:
+    log = open(MC_HOME / "dashboard.log", "ab")
+    MC_HOME.mkdir(parents=True, exist_ok=True)
+    subprocess.Popen([sys.executable, str(HERE / "dashboard.py"), "--port", str(port)], stdin=subprocess.DEVNULL, stdout=log,
+                     stderr=log, cwd=str(Path.home()), **compat.spawn_kwargs())  # an already-running older dashboard is replaced by the new one
+
+
+def cmd_open(a):
+    from urllib.parse import quote
+    port = a.port or int(os.environ.get("MC_PORT", "7777"))
+    root = project_root_for(a.path)
+    if root == Path.home() or root == Path(root.anchor):
+        die(f"{root} is not a project folder. Go into your project first (cd path/to/project) and run `mc open` there.")
+    known = {r.get("path") for r in registry()}
+    name = Mission(root).meta().get("name") or root.name
+    added = str(root) not in known
+    if added:
+        register(root, name)  # only the dashboard's list changes; nothing is written in the project
+    ready = bool(Mission(root).meta())
+
+    info = dashboard_info(port)
+    note = ""
+    if info and info.get("app") == "other":
+        die(f"Port {port} is used by another program. Use another port: mc open --port {port + 11}")
+    if info and info.get("app") == "mission-control":
+        stale = info.get("old") or float(info.get("started") or 0) < newest_code_time() - 1
+        if stale or a.restart:
+            busy = agents_working()
+            if busy and not a.restart:
+                note = (f"A newer version is installed. It will start the next time you run `mc open` while no agents are working "
+                        f"(now working: {', '.join(busy)}), or use `mc open --restart` to switch now.")
+                stale = False
+            else:
+                print("Restarting the dashboard to load the installed version…")
+                info = None
+                start_dashboard(port)
+    else:
+        print("Starting the dashboard…")
+        start_dashboard(port)
+        info = None
+    if info is None:
+        for _ in range(60):
+            time.sleep(0.25)
+            now_info = dashboard_info(port)
+            if now_info and now_info.get("app") == "mission-control" and not now_info.get("old") and \
+                    float(now_info.get("started") or 0) >= newest_code_time() - 1:
+                break
+        else:
+            tail = ""
+            try:
+                tail = "\n".join((MC_HOME / "dashboard.log").read_text(errors="replace").splitlines()[-6:])
+            except OSError:
+                pass
+            die(f"The dashboard didn't start on port {port}.\n{tail}\nTry it in the foreground to see why: python3 \"{HERE / 'dashboard.py'}\" --port {port}")
+    url = f"http://127.0.0.1:{port}/?p={quote(str(root))}"
+    print(f"✓ Mission Control is running: http://127.0.0.1:{port}/")
+    print(f"  Project: {name}" + (" (added to the dashboard)" if added else "")
+          + ("" if ready else "\n  It isn't set up for Mission Control yet. Press 🚀 Ignite in the dashboard to start."))
+    if note:
+        print("  " + note)
+    if not a.no_browser:
+        import webbrowser
+        if not webbrowser.open(url):
+            print(f"  Open this in your browser: {url}")
+    else:
+        print(f"  {url}")
+
+
 def cmd_dashboard(a):
     os.execv(sys.executable, [sys.executable, str(HERE / "dashboard.py"), "--port", str(a.port)] + (["--open"] if a.open else []))
 
@@ -3435,6 +3609,7 @@ def main(argv=None):
     s.add_argument("task"); s.add_argument("pairs", nargs="+"); s.set_defaults(fn=cmd_set)
 
     s = sub.add_parser("status", help="compact mission summary"); s.add_argument("--json", action="store_true")
+    s.add_argument("--soft", action="store_true", help="say so instead of failing when this folder has no mission")
     s.set_defaults(fn=cmd_status)
     sub.add_parser("checkpoint", help="write STATE.md for resuming in a fresh chat").set_defaults(fn=cmd_checkpoint)
 
@@ -3481,6 +3656,7 @@ def main(argv=None):
     s = sub.add_parser("note", help="leave a note for the supervisor"); s.add_argument("text", nargs="+")
     s.add_argument("--by", default="user"); s.set_defaults(fn=cmd_note)
     s = sub.add_parser("inbox", help="what needs the supervisor now"); s.add_argument("--peek", action="store_true")
+    s.add_argument("--soft", action="store_true", help="say so instead of failing when this folder has no mission")
     s.set_defaults(fn=cmd_inbox)
     s = sub.add_parser("wait", help="block until something needs the supervisor (no tokens while waiting)")
     s.add_argument("--timeout", type=int, default=540); s.add_argument("--batch", type=int, default=0)
@@ -3489,7 +3665,11 @@ def main(argv=None):
     s.set_defaults(fn=cmd_autopilot)
     s = sub.add_parser("projects", help="list registered projects"); s.add_argument("--remove", help="remove a project (path or name) from the dashboard; files are untouched")
     s.set_defaults(fn=cmd_projects)
-    s = sub.add_parser("dashboard", help="start the dashboard"); s.add_argument("--port", type=int, default=7777)
+    s = sub.add_parser("open", help="open the dashboard on this project: starts it if needed, adds the folder, opens your browser")
+    s.add_argument("path", nargs="?", help="a project folder (default: the current one)"); s.add_argument("--port", type=int)
+    s.add_argument("--no-browser", action="store_true", help="just print the address"); s.add_argument("--restart", action="store_true", help="restart the dashboard now, even if agents are working")
+    s.set_defaults(fn=cmd_open)
+    s = sub.add_parser("dashboard", help="run the dashboard in this terminal (mc open is easier)"); s.add_argument("--port", type=int, default=7777)
     s.add_argument("--open", action="store_true"); s.set_defaults(fn=cmd_dashboard)
 
     s = sub.add_parser("goal", help="set the agreed mission goal"); s.add_argument("text", nargs="+")
@@ -3545,7 +3725,8 @@ def main(argv=None):
     s.add_argument("--target", help="branch to sync with (default: the remote's default branch)")
     s.add_argument("--check", help="command that must pass afterwards, e.g. \"python3 -m unittest discover -s tests\"")
     s.add_argument("--model", help="model for the task (resolving conflicts is delicate)"); s.set_defaults(fn=cmd_sync_base)
-    s = sub.add_parser("git", help="git mode: status / on / off"); s.add_argument("state", nargs="?", choices=["on", "off", "status"], default="status")
+    s = sub.add_parser("git", help="git mode: status / on / off / bring (approved work into your folder) / follow on|off")
+    s.add_argument("state", nargs="?", choices=["on", "off", "status", "bring", "follow"], default="status"); s.add_argument("value", nargs="?", choices=["on", "off"])
     s.set_defaults(fn=cmd_git)
     s = sub.add_parser("_exec"); s.add_argument("root"); s.add_argument("task"); s.add_argument("attempt")
     s.set_defaults(fn=cmd_exec)

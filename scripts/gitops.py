@@ -216,9 +216,70 @@ def integrate(m, tid: str, title: str, human: bool = False) -> tuple:
     with open(m.dir / ".merge.lock", "a") as lf:
         compat.lock(lf)
         try:
-            return _integrate(m, tid, title, human)
+            res = _integrate(m, tid, title, human)
+            if res[0] and follows(m):
+                update_folder(m)  # approved work shows up in the user's own folder
+            return res
         finally:
             compat.unlock(lf)
+
+
+# ───────── the user's own folder follows the mission ─────────
+# Agents work on the mission branch in a hidden worktree, so the user's checkout is never changed
+# while they work. Approved work is then brought into the user's folder: automatically when that is a
+# plain fast-forward (nothing of theirs can be overwritten), or on request with a normal merge.
+
+def follows(m) -> bool:
+    return enabled(m) and cfg(m).get("follow", True) is not False
+
+
+def folder_status(m) -> dict:
+    """How the user's checkout compares with the mission branch."""
+    c = cfg(m)
+    if not enabled(m):
+        return {"enabled": False}
+    root, mission = m.root, c["branch"]
+    cur = git(root, "branch", "--show-current", check=False)
+    out = {"enabled": True, "follow": follows(m), "branch": cur, "base": c.get("base"), "mission": mission}
+    if not ok(root, "rev-parse", "--verify", mission):
+        return {**out, "behind": 0, "state": "up to date"}
+    behind = int(git(root, "rev-list", "--count", f"{cur or 'HEAD'}..{mission}", check=False) or 0)
+    files = [l for l in git(root, "diff", "--name-only", f"{cur or 'HEAD'}...{mission}", check=False).splitlines() if l][:200]
+    dirty = [l for l in git(root, "diff", "--name-only", "HEAD", check=False).splitlines() if l.strip()]  # staged or not
+    out.update(behind=behind, files=files)
+    if not behind:
+        return {**out, "state": "up to date"}
+    if cur != c.get("base"):
+        return {**out, "state": "waiting", "reason": f"your folder is on branch '{cur or '(detached)'}', and the mission builds on '{c.get('base')}'"}
+    if dirty:
+        return {**out, "state": "waiting", "reason": "you have uncommitted changes in " + ", ".join(dirty[:4]) + (" …" if len(dirty) > 4 else ""), "dirty": dirty}
+    if ok(root, "merge-base", "--is-ancestor", cur, mission):
+        return {**out, "state": "fast-forward"}
+    return {**out, "state": "waiting", "reason": f"'{cur}' has commits of its own, so bringing the work in needs a merge commit", "needs_merge": True}
+
+
+def update_folder(m, merge: bool = False) -> tuple:
+    """Bring approved mission work into the user's folder. Fast-forward only, unless merge=True
+    (the user pressed the button). Never touches uncommitted changes. Returns (ok, message)."""
+    st = folder_status(m)
+    if not st.get("enabled"):
+        return False, "git mode is off"
+    if st["state"] == "up to date":
+        return True, "your folder is up to date"
+    if st["state"] == "waiting" and not (merge and st.get("needs_merge")):
+        return False, st["reason"]
+    args = ["merge", "--ff-only", st["mission"]] if st["state"] == "fast-forward" else \
+           [*_identity_args(m.root), "merge", "--no-edit", "-m", f"Bring in the mission's approved work ({st['mission']})", st["mission"]]
+    cp = subprocess.run(["git", *args], cwd=str(m.root), capture_output=True, text=True)
+    if cp.returncode != 0:
+        if _merging(m.root):
+            ok(m.root, "merge", "--abort")  # leave the folder exactly as it was
+        msg = (cp.stderr or cp.stdout).strip()
+        if "would be overwritten" in msg:
+            names = [l.strip() for l in msg.splitlines() if l.startswith(("\t", "    "))][:4]
+            return False, "files in your folder that git doesn't track would be overwritten: " + ", ".join(names)
+        return False, "git couldn't bring it in: " + (msg.splitlines() or ["unknown error"])[-1][:160]
+    return True, f"brought {st['behind']} commit{'s' if st['behind'] != 1 else ''} into your folder ({st['branch']})"
 
 
 def _integrate(m, tid: str, title: str, human: bool = False) -> tuple:

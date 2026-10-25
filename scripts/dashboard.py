@@ -30,6 +30,7 @@ if __name__ == "__main__":
 
 UI = mc.SKILL_DIR / "dashboard" / "index.html"
 TOKEN = secrets.token_hex(16)
+STARTED = time.time()  # `mc open` compares this with the installed code to know when to restart
 CHILD_LOCK = threading.Lock()
 
 
@@ -193,10 +194,11 @@ def full_state(m: mc.Mission) -> dict:
     if sup.get("running") and not mc.pid_alive(sup.get("pid")):
         sup = mc.sup_update(m, running=False, pid=None, step="")
     resume = (f'cd "{m.root}" && PATH="{mc.ensure_mc_shim()}:$PATH" claude --resume {sup["session_id"]}' if sup.get("session_id") else "")
-    return {"mission": m.meta(), "supervisor": sup, "resume_cmd": resume, "watches": mc.watch_list(m) if mc.watches_dir(m).exists() else [], "chat": mc.chat_log(m)[-200:], "path": str(m.root), "tasks": tasks, "questions": [dict(q, perm_info=mc.perm_infos(q["permission"])) if q.get("permission") else q for q in m.questions()],
+    return {"mission": m.meta(), "supervisor": sup, "resume_cmd": resume, "watches": mc.watch_list(m) if mc.watches_dir(m).exists() else [], "chat": mc.chat_log(m)[-200:], "path": str(m.root), "tasks": tasks, "questions": [dict(q, perm_info=mc.perm_infos(q["permission"], m)) if q.get("permission") else q for q in m.questions()],
             "plan_permissions": mc.plan_permission_rules(m) if meta.get("phase") == "awaiting_approval" else [],
             "notes": m.notes()[-50:], "events": m.events()[-300:], "runners": runners,
             "ready": [t["id"] for t in mc.ready_tasks(m, tasks)], "server_time": mc.now(),
+            "folder": mc.gitops.folder_status(m) if mc.gitops.enabled(m) else {"enabled": False},
             "access": {"mode": mc.access_mode(m), "chosen": meta.get("access") or "sandbox", "supported": mc.sandbox_supported(),
                        "domains": mc.net_domains(m), "default_domains": mc.DEFAULT_DOMAINS}}
 
@@ -355,6 +357,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"clone_dir": str(default_clone_dir()).replace(str(Path.home()), "~", 1)})
             if u.path == "/api/notify":
                 return self._send(200, mc.notify.masked())
+            if u.path == "/api/info":
+                return self._send(200, {"app": "mission-control", "pid": os.getpid(), "started": STARTED})
             if u.path == "/api/calendar":
                 a, b = (date.fromisoformat(q[k]) for k in ("from", "to"))
                 if not 0 <= (b - a).days <= 62:
@@ -554,6 +558,19 @@ class Handler(BaseHTTPRequestHandler):
                     doms = [str(d).strip().lower() for d in body["domains"] if re.fullmatch(r"(\*\.)?[a-z0-9.-]+(:\d+)?", str(d).strip().lower())]
                     meta["net_domains"] = sorted(set(doms))
                 m.save_meta(meta)
+            elif u.path == "/api/folder":
+                if "follow" in body:
+                    mc.git_save(m)({"follow": bool(body["follow"])})
+                if body.get("bring"):
+                    with open(m.dir / ".merge.lock", "a") as lf:  # not while a task is being merged
+                        mc.compat.lock(lf)
+                        try:
+                            okk, msg = mc.gitops.update_folder(m, merge=True)
+                        finally:
+                            mc.compat.unlock(lf)
+                    if okk:
+                        m.event("note", "user", msg)
+                    return self._send(200 if okk else 409, {"ok": okk, "message": msg, "error": None if okk else msg})
             elif u.path == "/api/snapshot":
                 act = body.get("action")
                 if act == "toggle":
