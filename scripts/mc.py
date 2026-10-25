@@ -3097,6 +3097,17 @@ def add_note(m: Mission, text: str, by: str = "user") -> None:
     m.event("note", by, f"note to supervisor: {short(text, 140)}")
 
 
+def user_message(m: Mission, text: str) -> None:
+    """A message from the user to this project's supervisor: shown in Chat, and it wakes a dashboard supervisor
+    (an external one gets it as a note)."""
+    if (m.meta().get("supervisor") or {}).get("mode") == "dashboard":
+        chat_add(m, "user", text)
+        wake_supervisor(m)
+    else:
+        chat_add(m, "user", text, delivered=True)
+        add_note(m, text, "user")
+
+
 def cmd_note(a):
     add_note(need_mission(), " ".join(a.text), a.by)
 

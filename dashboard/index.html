@@ -433,6 +433,15 @@ code{font-family:var(--mono);font-size:.92em}
 .st-M{color:var(--orange);background:color-mix(in srgb,var(--orange) 14%,transparent)}
 .st-D{color:var(--red);background:color-mix(in srgb,var(--red) 14%,transparent)}
 .st-A{color:var(--green);background:color-mix(in srgb,var(--green) 14%,transparent)}
+/* ── send to supervisor ── */
+.pickb{border:0;background:none;color:var(--dim);cursor:pointer;font-size:15px;line-height:1;padding:2px 6px;border-radius:6px;flex:none;align-self:flex-start;opacity:.55}
+.trow:hover .pickb,.pickb.on{opacity:1}.pickb:hover{background:var(--fill2);color:var(--blue)}
+.pickb.on{background:color-mix(in srgb,var(--blue) 16%,transparent);color:var(--blue)}
+.sendtray{border-left:4px solid var(--blue)}
+.sgroup{padding:10px 0;border-top:1px solid var(--line)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 4px}
+.chip2{border:0;background:var(--fill2);color:var(--text);border-radius:980px;padding:5px 12px;font:500 12.5px var(--ui);cursor:pointer}
+.chip2.on{background:var(--blue);color:#fff}
 /* ── your folder ── */
 .folderb{display:flex;gap:14px;align-items:center;padding:14px 18px;margin-bottom:12px;border-left:4px solid var(--orange)}
 /* ── milestones ── */
@@ -695,7 +704,7 @@ function changed(key, data){ const h=JSON.stringify(data); if(S.hashes[key]===h)
 function render(){
   renderNav(); renderHeader();
   const v = S.view, cp = S.projects.find(p=>p.path===S.cur), splash = cp && !cp.initialized && !GLOBAL.has(v);
-  const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="phases"||v==="board" ? [S.st?.tasks,S.st?.mission,S.ms,S.st?.plan_permissions,S.st?.folder,S.cur] : v==="calendar" ? [S.calMode,S.calA,S.calData,S.calEvt?.uid,S.calEvt?.start] : v==="today" ? [S.today, S.calDay, S.calEvt?.uid, S.calEvt?.start, S.projects.map(p=>[p.name,p.needs_you,p.phase,p.counts])] : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
+  const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="phases"||v==="board" ? [S.st?.tasks,S.st?.mission,S.ms,S.st?.plan_permissions,S.st?.folder,S.cur] : v==="calendar" ? [S.calMode,S.calA,S.calData,S.calEvt?.uid,S.calEvt?.start] : v==="today" ? [S.today, S.calDay, [...(S.picked||[])], S.sendIntent, S.sendProj, S.calEvt?.uid, S.calEvt?.start, S.projects.map(p=>[p.name,p.needs_you,p.phase,p.counts])] : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
   if(changed("main", [splash?"ignite":v, S.cur, data, v==="settings"?[S.st?.folder,S.notify,S.snaps,S.snapOpen,S.snapChanges,S.st?.access,S.st?.mission,S.st?.supervisor]:0])){
     const act = document.activeElement, aid = act && act.id, sel = act && act.selectionStart;
     const cl=$("chatlog"), stick=!cl || S.chatBottom || cl.scrollTop+cl.clientHeight>=cl.scrollHeight-60, clTop=cl?.scrollTop||0, sideTop=document.querySelector(".side")?.scrollTop||0, doneTop=document.querySelector(".tdone")?.scrollTop||0, calTop=$("calScroll")?.scrollTop, qsTop=$("qscroll")?.scrollTop||0;
@@ -1108,10 +1117,28 @@ function dfmt(d){ if(!d) return ""; const x=new Date(d.length>10?d:d+"T00:00"); 
 function projName(path){ return (S.today?.projects||[]).find(p=>p.path===path)?.name; }
 function projSelect(attr, cur, extra=""){ const ps=S.today?.projects||[];
   return `<select class="sel" ${attr} ${extra}><option value="">No project</option>${ps.map(p=>`<option value="${esc(p.path)}" ${p.path===cur?"selected":""}>${esc(p.name)}</option>`).join("")}</select>`; }
+/* ── send to-dos to a supervisor ── */
+const INTENT_UI=[["help","Help me","Use the agents or tell me what you need"],["replan","Replan","Check the plan and propose changes for my approval"],["fyi","Just so you know","Act only if it conflicts with the plan"]];
+function pickedItems(T){ const ids=S.picked||new Set(); return T.items.filter(i=>!i.done&&ids.has(i.id)); }
+function sendTray(T){
+  const picked=pickedItems(T); if(!picked.length) return "";
+  const groups={}; picked.forEach(i=>(groups[i.project||""]=groups[i.project||""]||[]).push(i));
+  return `<div class="panel tpanel sendtray"><div style="display:flex;justify-content:space-between;align-items:center"><h3>Send to a supervisor</h3><button class="btn sm" data-tpickclear>Clear</button></div>
+    <p class="muted" style="font-size:12px;margin:2px 0 6px">Each group goes to the supervisor of its project, as a message in that project's Chat. It receives the to-do, its dates, and the email's subject and sender, never the email itself.</p>
+    ${Object.entries(groups).map(([g,list])=>{ const chosen=g||S.sendProj?.[""]||"", pj=(S.projects||[]).find(p=>p.path===chosen), intent=S.sendIntent?.[g]||"help", ok=chosen&&pj?.initialized;
+      return `<div class="sgroup"><div style="font-weight:600;font-size:13.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${g?`→ ${esc(projName(g)||"project")}`:`→ ${projSelect('data-sproj aria-label="Project"',chosen)}`} <span class="muted" style="font-weight:400;font-size:12px">${list.length} to-do${list.length===1?"":"s"}</span></div>
+        ${list.map(i=>`<div class="sitem"><span class="tx">${esc(i.text)}</span><button class="x2" data-tpick="${esc(i.id)}" aria-label="Remove from the selection">×</button></div>`).join("")}
+        <div class="chips">${INTENT_UI.map(([k,l])=>`<button class="chip2 ${intent===k?"on":""}" data-sintent="${esc(g)}|${k}">${l}</button>`).join("")}</div>
+        <div class="muted" style="font-size:12px;margin:2px 0 6px">${esc(INTENT_UI.find(x=>x[0]===intent)[2])}</div>
+        <textarea class="inp" rows="2" data-draft="sn-${esc(g)}" placeholder="Anything to add? (optional)">${esc(S.drafts["sn-"+g]||"")}</textarea>
+        ${chosen&&pj&&!pj.initialized?`<div style="font-size:12px;color:var(--orange);margin-top:4px">${esc(pj.name)} isn't set up for Mission Control yet, so it has no supervisor.</div>`:""}
+        <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn sm primary" data-tsend="${esc(g)}" ${ok?"":"disabled"}>Send to ${esc(pj?.name||"supervisor")}</button></div></div>`; }).join("")}</div>`;
+}
 function itemRow(it){
   const pn=projName(it.project), late=it.due&&!it.done&&it.due<S.today.now.slice(0,10);
   return `<div class="trow ${it.done?"done":""}"><input type="checkbox" data-tdone="${esc(it.id)}" ${it.done?"checked":""} aria-label="Done">
-    <div class="tx">${esc(it.text)}<div class="meta">${pn?`<span class="tag">${esc(pn)}</span>`:""}${it.due?`<span class="tag" style="${late?"color:var(--red)":""}">${late?"was due ":"due "}${dfmt(it.due)}</span>`:""}${it.remind_at?`<span class="tag">⏰ ${dfmt(it.remind_at)}</span>`:""}${it.source?`<span class="tag" title="From: ${esc(it.source.from||"")}">✉ ${esc(short(it.source.subject||it.source.file,40))}</span>`:""}</div></div>
+    <div class="tx">${esc(it.text)}<div class="meta">${pn?`<span class="tag">${esc(pn)}</span>`:""}${it.due?`<span class="tag" style="${late?"color:var(--red)":""}">${late?"was due ":"due "}${dfmt(it.due)}</span>`:""}${it.remind_at?`<span class="tag">⏰ ${dfmt(it.remind_at)}</span>`:""}${it.sent?`<span class="tag" style="color:var(--blue);cursor:pointer" data-opench="${esc(it.sent.project)}" title="Sent to ${esc(projName(it.sent.project)||"the supervisor")} (${esc(it.sent.intent)}). Click to open its chat">↗ sent ${esc(it.sent.at.slice(11))}</span>`:""}${it.source?`<span class="tag" title="From: ${esc(it.source.from||"")}">✉ ${esc(short(it.source.subject||it.source.file,40))}</span>`:""}</div></div>
+    ${it.done?"":`<button class="pickb ${(S.picked||new Set()).has(it.id)?"on":""}" data-tpick="${esc(it.id)}" aria-label="Send to a supervisor" title="Send to this project's supervisor">⇢</button>`}
     <button class="x2" data-tact="del" data-id="${esc(it.id)}" aria-label="Delete">×</button></div>`;
 }
 function short(t,n){ t=String(t||""); return t.length>n?t.slice(0,n-1)+"…":t; }
@@ -1263,6 +1290,7 @@ function viewToday(){
     <div class="tadd"><input class="inp" id="t-new" data-draft="t-new" placeholder="Add a to-do" value="${esc(S.drafts["t-new"]||"")}">
       ${projSelect('id="t-proj" data-draft="t-proj"',S.drafts["t-proj"]||"")}<input class="inp" type="date" id="t-due" data-draft="t-due" value="${esc(S.drafts["t-due"]||"")}" aria-label="Due date">
       <button class="btn sm primary" data-tact="add">Add</button></div></div>`;
+  const trayP=sendTray(T);
   const remP=`<div class="panel tpanel"><h3>Reminders</h3><p class="muted" style="font-size:12.5px;margin:0 0 6px">Each one pings your notification channels once, at its time.</p>
     ${rem.map(itemRow).join("")||`<div class="muted" style="font-size:13px">No reminders.</div>`}
     <div class="tadd"><input class="inp" id="r-new" data-draft="r-new" placeholder="Remind me to…" value="${esc(S.drafts["r-new"]||"")}">
@@ -1303,7 +1331,7 @@ function viewToday(){
     <p class="muted" style="font-size:12px;margin:4px 0 0">Client names, colleagues, codenames. The reader matches emails against these and each project's goal.</p>
     ${T.projects.map(p=>`<div class="lrow"><span style="font-size:13px;flex:none;max-width:40%">${esc(p.name)}</span><input class="inp" data-tprof="${esc(p.path)}" placeholder="e.g. Acme, Sara, Stripe" value="${esc((cfg.profiles[p.path]||{}).aliases||"")}"></div>`).join("")||`<div class="muted" style="font-size:12.5px">Add a project first.</div>`}
     ${cfg.rules.length?`<div class="label" style="margin-top:14px">Learned rules</div>${cfg.rules.map((r,i)=>`<div class="lrow"><span style="font-size:13px">${esc(r.from)} → ${esc(r.name)}</span><button class="x2" data-tact="rmrule" data-i="${i}" aria-label="Remove rule">×</button></div>`).join("")}`:""}</details>`;
-  return head(hello, sub) + `<div class="today"><div>${needsP}${calPanel(T)}${todoP}${remP}</div><div>${inboxP}${notesP}${setP}</div></div>` + evSheet();
+  return head(hello, sub) + `<div class="today"><div>${needsP}${calPanel(T)}${todoP}${trayP}${remP}</div><div>${inboxP}${notesP}${setP}</div></div>` + evSheet();
 }
 async function todayPost(action, body){ S.today=await post("/api/today/"+action, body); delete S.hashes.main; render(); }
 async function todayAct(el){
@@ -1560,7 +1588,7 @@ async function refreshLog(){
 
 /* ───────── events ───────── */
 document.addEventListener("click", async e=>{
-  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-ms],#bringIn,[data-calday],[data-calmode],[data-calnav],[data-calgo],[data-calday-go],[data-ev],[data-evclose],[data-evtodo],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
+  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-tpick],[data-tpickclear],[data-sintent],[data-tsend],[data-opench],[data-ms],#bringIn,[data-calday],[data-calmode],[data-calnav],[data-calgo],[data-calday-go],[data-ev],[data-evclose],[data-evtodo],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
   if(!el) return;
   try{
     if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(S.view==="comms") S.chatBottom=true; if(!GLOBAL.has(S.view)){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
@@ -1586,6 +1614,16 @@ document.addEventListener("click", async e=>{
     if(el.id==="sendChat"){ return sendChat(); }
     if(el.dataset.tact){ await todayAct(el); return; }
     if(el.id==="bringIn"){ el.disabled=true; el.textContent="Bringing in…"; const r=await post("/api/folder",{bring:true}).catch(e=>({ok:false,message:e.message})); toast(r.message||"Done",!r.ok); await tick(); return; }
+    if(el.dataset.tpick!==undefined){ S.picked=S.picked||new Set(); const id=el.dataset.tpick; S.picked.has(id)?S.picked.delete(id):S.picked.add(id); delete S.hashes.main; render(); return; }
+    if(el.dataset.tpickclear!==undefined){ S.picked=new Set(); delete S.hashes.main; render(); return; }
+    if(el.dataset.sintent){ const [g,k]=el.dataset.sintent.split("|"); S.sendIntent={...(S.sendIntent||{}),[g]:k}; delete S.hashes.main; render(); return; }
+    if(el.dataset.opench){ selectProject(el.dataset.opench,"comms"); delete S.hashes.main; await tick(); return; }
+    if(el.dataset.tsend!==undefined){ const g=el.dataset.tsend, T=S.today, list=pickedItems(T).filter(i=>(i.project||"")===g), project=g||S.sendProj?.[""]||"";
+      if(!list.length||!project) return; el.disabled=true; el.textContent="Sending…";
+      try{ const r=await post("/api/today/send",{items:list.map(i=>i.id),project,intent:S.sendIntent?.[g]||"help",message:S.drafts["sn-"+g]||""});
+        S.today=r; list.forEach(i=>S.picked.delete(i.id)); S.drafts["sn-"+g]=""; if(!g) S.sendProj={...S.sendProj,"":""};
+        toast(`Sent to ${r.project}'s supervisor. See its reply in that project's Chat`); }catch(err){ /* post() already showed the reason */ }
+      delete S.hashes.main; render(); return; }
     if(el.dataset.ms){ S.ms=el.dataset.ms; delete S.hashes.main; render(); return; }
     if(el.dataset.ev){ if(e.target.closest("a[href]")) return; const o=findEv(el.dataset.ev); if(o){ S.calEvt=o; delete S.hashes.main; render(); } return; }
     if(el.dataset.evclose!==undefined){ S.calEvt=null; delete S.hashes.main; render(); return; }
@@ -1689,6 +1727,7 @@ document.addEventListener("change", async e=>{ const t=e.target;
   if(t.dataset?.tdone) return todayPost("item",{id:t.dataset.tdone,patch:{done:t.checked}}).catch(()=>{});
   if(t.dataset?.tmove!==undefined){ await todayPost("suggestion",{id:t.dataset.tmove,action:"move",project:t.value||null}).catch(()=>{}); return toast(t.value?"Moved. Emails from this sender will go there from now on":"Moved"); }
   if(t.dataset?.tmeet!==undefined) return todayPost("config",{config:{meeting_reminder:+t.value}}).then(()=>toast(+t.value?`You'll be pinged ${t.value} min before meetings`:"Meeting pings off")).catch(()=>{});
+  if(t.dataset?.sproj!==undefined){ S.sendProj={...(S.sendProj||{}),"":t.value}; delete S.hashes.main; render(); return; }
   if(t.dataset?.tauto!==undefined) return todayPost("config",{config:{auto:t.checked}}).catch(()=>{});
   if(t.dataset?.treader!==undefined){ const [ty,md]=t.value.split(":"); return todayPost("config",{config:{reader:{type:ty,...(md?{model:md}:{})}}}).catch(()=>{}); }
   if(t.dataset?.tprof) return todayPost("config",{config:{profile:{project:t.dataset.tprof,aliases:t.value}}}).then(()=>toast("Saved")).catch(()=>{});

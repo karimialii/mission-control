@@ -277,6 +277,27 @@ def supervisor_loop() -> None:
         time.sleep(2)
 
 
+def today_send(body: dict) -> dict:
+    """Send picked to-dos to the supervisor of the project they belong to."""
+    path = str(body.get("project") or "")
+    if path not in project_paths() or not initialized(path):
+        raise ValueError("That project isn't set up for Mission Control yet, so it has no supervisor. Open it and press Ignite first.")
+    ids = [str(i) for i in (body.get("items") or [])]
+    items = [it for it in today.items() if it["id"] in ids and not it["done"]]
+    if not items:
+        raise ValueError("Pick at least one open to-do first")
+    other = [it for it in items if it.get("project") and it["project"] != path]
+    if other:
+        raise ValueError("Those to-dos belong to a different project. Send each project's to-dos separately")
+    intent = body.get("intent") if body.get("intent") in today.INTENTS else "help"
+    m = mc.Mission(path)
+    text = today.compose_message(items, intent, str(body.get("message") or "").strip(), today.now_local())
+    mc.user_message(m, text)
+    m.event("note", "user", f"{len(items)} to-do{'s' if len(items) != 1 else ''} sent from the Today page ({today.INTENTS[intent][0]})")
+    today.mark_sent([it["id"] for it in items], path, intent)
+    return {"sent": len(items), "project": m.meta().get("name") or Path(path).name}
+
+
 def today_post(action: str, body: dict) -> dict:
     """The Today page's writes. ValueError becomes a 400 with its message."""
     if action == "config":
@@ -289,6 +310,8 @@ def today_post(action: str, body: dict) -> dict:
         idx = body.get("item")
         today.resolve(str(body.get("id")), str(body.get("action")), int(idx) if idx is not None else None,
                       body.get("edits"), body.get("project"))
+    elif action == "send":
+        return {"ok": True, **today_send(body), **today.state()}
     elif action == "notes":
         today.notes(str(body.get("text", "")))
     elif action == "process":
@@ -472,12 +495,7 @@ class Handler(BaseHTTPRequestHandler):
                 text = str(body.get("text", "")).strip()
                 if not text:
                     return self._send(400, {"error": "empty message"})
-                if (m.meta().get("supervisor") or {}).get("mode") == "dashboard":
-                    mc.chat_add(m, "user", text)
-                    mc.wake_supervisor(m)
-                else:
-                    mc.chat_add(m, "user", text, delivered=True)
-                    mc.add_note(m, text, "user")
+                mc.user_message(m, text)
             elif u.path == "/api/models":
                 runners = mc.load_runners()
                 for k in ("sup_runner", "exec_runner"):

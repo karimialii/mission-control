@@ -250,6 +250,44 @@ def reminders_tick() -> int:
     return len(due)
 
 
+# What the user wants from the supervisor when they send it to-dos from the Today page.
+INTENTS = {
+    "help": ("help me with them", "Please help me get these done. Use the mission's agents where it makes sense, and otherwise tell me exactly "
+             "what you need from me. Only start what is already approved; for anything new, propose it first."),
+    "replan": ("replan around them", "These may change the plan. Compare them with the current milestone and tell me what you would change. "
+              "If the plan should change, write the proposal for my approval; don't start new work until I approve it."),
+    "fyi": ("for your information only", "For your information only. Act only if one of these conflicts with the current plan, and then tell me."),
+}
+
+
+def compose_message(items: list, intent: str, message: str, now: str) -> str:
+    """The text a supervisor receives. It carries the to-do, its dates and where it came from (the email's
+    subject and sender), never the email itself."""
+    lines = []
+    for it in items:
+        bits = []
+        if it.get("due"):
+            bits.append("due " + it["due"])
+        if it.get("remind_at"):
+            bits.append("reminder " + it["remind_at"].replace("T", " "))
+        src = it.get("source") or {}
+        if src.get("subject") or src.get("from"):
+            bits.append("from the email " + " · ".join(x for x in ((f'"{src["subject"]}"' if src.get("subject") else ""), src.get("from", "")) if x))
+        lines.append(f"- {it['text']}" + (f" ({'; '.join(bits)})" if bits else ""))
+    head = f"[From my Today list, {now.replace('T', ' ')}] I'm sending you {'this to-do' if len(items) == 1 else 'these to-dos'}. What I want: {INTENTS[intent][0].replace('them', 'it' if len(items) == 1 else 'them')}."
+    return "\n".join([head, "", *lines, "", *([message, ""] if message else []), INTENTS[intent][1]])
+
+
+def mark_sent(ids: list, project: str, intent: str) -> None:
+    with lock():
+        rows = items()
+        for it in rows:
+            if it["id"] in ids:
+                it["project"] = it.get("project") or project
+                it["sent"] = {"at": now_local(), "project": project, "intent": intent}
+        _write("items.json", rows)
+
+
 def notes(text: str | None = None) -> str:
     p = _p("notes.md")
     if text is not None:

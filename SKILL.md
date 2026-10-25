@@ -87,6 +87,13 @@ Before launching, show the user the plan in 3–6 lines (it's also in the Phases
 
 After 3 failed attempts on the same task, stop retrying. Split it, rewrite the brief, switch to a stronger model, or take it over yourself.
 
+## To-dos the user sends you
+A message that starts with `[From my Today list …]` comes from the user's personal to-do list (they picked these items to send you). It says what they want from you:
+- **help me with them:** work out what the mission's agents can do and what only the user can do. Start only what the approved plan already covers; propose anything new (a task or a milestone plan) and wait for their approval.
+- **replan around them:** compare them with the current milestone. If the plan should change, say what and why in a few lines, and write the proposal (`MC plan` with a `"milestone"`) for their approval. Don't start new work first.
+- **for your information only:** act only if an item conflicts with the plan; otherwise acknowledge in one line.
+Always reply in chat, short, naming each to-do you're addressing. The to-dos stay on the user's list; don't try to read or edit their Today page. Items that mention an email give only its subject and sender: if you need more, ask the user.
+
 ## 5 · Talking to the user
 - The user can answer in the dashboard's **Comms** tab or in this chat. If they answer in chat, still record it with `MC answer Q-00n "<their answer>" --by user` so the dashboard card closes.
 - `MC wait` keeps waiting while a question to the user is open, and wakes when they answer in the dashboard.
