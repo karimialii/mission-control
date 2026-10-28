@@ -284,6 +284,15 @@ The dashboard checks it every N seconds **without using any tokens**, and wakes 
 - **Deliberately not shell commands.** The conditions are a small set of read-only checks inside the project folder, so a watch can't be used to run commands the supervisor isn't allowed to run.
 - At most 10 active watches per mission. Without the dashboard running, an external supervisor's `mc wait` checks them too.
 
+## Plan limits (the 5-hour and 7-day windows)
+A Claude subscription has two limits: a 5-hour window and a 7-day window, shared by **every project and every run** on your account. Every Claude run reports how full they are, and Mission Control keeps the newest reading in one file (`~/.mission-control/limits.json`), so all projects see the same numbers. The header of the dashboard shows both as small meters.
+- **Runs wait near the limit.** From 85% of either window, no new executor starts; from 95%, the supervisor's automatic turns wait too. Executors stop earlier so the supervisor still has room to review their work. Your own chat messages go through until the limit is actually reached. A reading older than its window's reset time counts as unknown, not full. Start a task yourself with **Run** to override the hold.
+- **A run the limit cuts off is not an attempt.** It isn't reviewed and doesn't count toward the attempt limit. The task goes back to *todo*, restarts by itself after the reset, and its brief says to resume from what it already saved rather than start over. The cut-off run still shows in Usage.
+- **The supervisor** keeps your messages and the updates it hasn't read, and carries on after the reset. You get one note in the chat, not one per tick.
+- **Notifications.** One ping when runs are held (turn it off under Notifications → "plan limit").
+- **Change the thresholds** in Settings → Plan limits, or `mc quota --executor 80 --supervisor 95` (`--off` to never hold; a limit that is really reached still pauses runs). `mc quota` alone prints the current usage. Only Claude runs report limits; Codex and Gemini runs are not held.
+- On a subscription the dollar figures in Usage are list prices, not what you pay. The meters are the real constraint.
+
 ## Safety limits (nothing loops, nothing runs away)
 Set in **Settings → Safety limits**, or `mc.py limits`:
 
@@ -384,9 +393,11 @@ Runner templates live in `runners.default.json`. To override or add one, create 
 
 ## Token model
 - Executors start fresh for every task and every retry. Their context is only the brief, about 300–500 words plus your codebase reads.
+- Claude runs skip your personal Claude setup (user-level plugins, agents and hooks) and load only the tools a task uses (`--setting-sources project,local --tools …`). A headless `claude` otherwise re-sends about 27k tokens of that on every model call. Project-level settings and `CLAUDE.md` still apply. To turn this off for a mission, set `"lean_context": false` in `.mission/mission.json`.
 - The supervisor never reads transcripts, only ≤150-word reports. `mc.py wait` blocks without using model tokens.
 - Tasks with a `check` command auto-approve when the check passes, so there's no supervisor review turn. In dashboard mode, the supervisor wakes only for things that need judgment: reviews, questions, errors, your messages, and the end of the mission. Routine events ride along in its next turn.
-- `.mission/STATE.md` (`mc.py checkpoint`) lets you throw away a long supervisor chat and resume in a fresh one.
+- `.mission/STATE.md` (`mc.py checkpoint`) lets you throw away a long supervisor chat and resume in a fresh one. The dashboard does this on its own: once a supervisor turn ends with more than 50,000 tokens of context (every call re-reads all of it), the next turn starts a fresh session from `STATE.md`. Things only said in the chat and never saved with `mc decide` are forgotten, so record preferences as decisions. Change the limit per mission with `"supervisor": {"max_context": 80000}` in `.mission/mission.json`.
+- After more than an hour idle, the prompt cache has expired, and resuming would re-write the whole chat at full price. So when the context is over 20,000 tokens, the next turn starts fresh from `STATE.md` instead. Change it with `"supervisor": {"idle_fresh_minutes": 120}`, or `0` to always resume.
 - Token counts are exact for runners that report usage (Claude, Codex, Gemini) and self-reported for manual executors. The supervisor's own chat isn't counted.
 
 ## Files

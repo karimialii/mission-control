@@ -68,12 +68,20 @@ a{color:var(--blue);text-decoration:none}
 .side-add{margin-top:auto;color:var(--blue) !important}
 /* content column */
 .content{display:flex;flex-direction:column;min-width:0;height:100dvh}
-.toolbar{display:flex;align-items:center;gap:12px;padding:12px 28px;min-height:60px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);z-index:var(--z-tool)}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:12px 28px;min-height:60px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);z-index:var(--z-tool)}
 .tb-title{min-width:0;display:flex;flex-direction:column}
 .tb-title h2{margin:0;font:600 15px var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tb-title small{color:var(--mute);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
 .proj-select{display:none}
 .hstats{display:flex;gap:18px;margin-left:auto;align-items:center}
+.quota{display:flex;gap:14px;align-items:center}
+.quota:empty{display:none}
+.qm{display:grid;grid-template-columns:auto 56px auto;gap:6px;align-items:center;font:500 11.5px var(--ui);color:var(--mute);white-space:nowrap}
+.qm b{font-weight:600;color:var(--text);min-width:2.4em;text-align:right}
+.qbar{height:5px;border-radius:3px;background:var(--fill);overflow:hidden}
+.qbar i{display:block;height:100%;border-radius:3px;transition:width .4s}
+.qpill{font:600 11px var(--ui);padding:3px 9px;border-radius:980px;background:color-mix(in srgb,var(--orange) 16%,transparent);color:var(--orange);white-space:nowrap}
+.qpill.hard{background:color-mix(in srgb,var(--red) 16%,transparent);color:var(--red)}
 .chip{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2}
 .chip small{font-size:11px;color:var(--mute)}
 .chip span{font:600 15px var(--display)}
@@ -356,6 +364,7 @@ code{font-family:var(--mono);font-size:.92em}
   .tb-title{display:none}
   .proj-select{display:block;flex:1;min-width:0;font-weight:600;font-size:15px;background-color:var(--fill2)}
   .hstats{width:100%;margin:0;gap:14px;overflow-x:auto;justify-content:space-between}
+  .quota{width:100%;flex-wrap:wrap;gap:8px 14px}
   .chip{align-items:flex-start}
   .wrap{padding:20px 16px 40px}
   .view-title h1{font-size:26px}
@@ -613,6 +622,7 @@ code{font-family:var(--mono);font-size:.92em}
       <div class="tb-title"><h2 id="tbTitle">Mission Control</h2><small id="tbSub"></small></div>
       <select class="proj-select sel" id="projSel" aria-label="Project"></select>
       <div class="hstats" id="hstats"></div>
+      <div class="quota" id="quota"></div>
     </header>
     <main id="main"></main>
   </div>
@@ -687,6 +697,7 @@ async function tick(){
     await loadProjects();
     const cp = S.projects.find(p=>p.path===S.cur);
     S.st = cp && cp.initialized ? await api("/api/state?p="+encodeURIComponent(S.cur)) : null;
+    S.quota = await api("/api/quota").catch(()=>S.quota);
     if(S.view==="tokens") await loadUsage();
     if(S.view==="today") S.today=await api("/api/today").catch(()=>S.today);
     if(S.view==="calendar") await loadCal();
@@ -702,7 +713,7 @@ setInterval(tick, 2000);
 function changed(key, data){ const h=JSON.stringify(data); if(S.hashes[key]===h) return false; S.hashes[key]=h; return true; }
 
 function render(){
-  renderNav(); renderHeader();
+  renderNav(); renderHeader(); renderQuota();
   const v = S.view, cp = S.projects.find(p=>p.path===S.cur), splash = cp && !cp.initialized && !GLOBAL.has(v);
   const data = splash ? ["ignite", cp] : v==="tokens" ? [S.usageScope,S.usageFilter,[...S.usageOpen],S.usage,S.fleet,Object.keys(S.usageCalls).length,S.st?.mission?.name,S.cur] : v==="overview" ? S.projects : v==="phases"||v==="board" ? [S.st?.tasks,S.st?.mission,S.ms,S.st?.plan_permissions,S.st?.folder,S.cur] : v==="calendar" ? [S.calMode,S.calA,S.calData,S.calEvt?.uid,S.calEvt?.start] : v==="today" ? [S.today, S.calDay, [...(S.picked||[])], S.sendIntent, S.sendProj, S.calEvt?.uid, S.calEvt?.start, S.projects.map(p=>[p.name,p.needs_you,p.phase,p.counts])] : v==="feed" ? [S.st?.events, S.feedFilter, S.cur] : v==="comms" ? [S.st?.questions, S.st?.chat, S.st?.supervisor, S.st?.mission, S.st?.tasks?.length, S.st?.watches, S.cur] : [S.st?.tasks, S.st?.mission, S.st?.supervisor, S.cur, v==="phases"?$("main").clientWidth:0];
   if(changed("main", [splash?"ignite":v, S.cur, data, v==="settings"?[S.st?.folder,S.notify,S.snaps,S.snapOpen,S.snapChanges,S.st?.access,S.st?.mission,S.st?.supervisor]:0])){
@@ -734,6 +745,21 @@ function renderNav(){
   $("tbTitle").textContent = S.view==="overview" ? "All Projects" : S.view==="today" ? "Today" : S.view==="calendar" ? "Calendar" : (cp?.name || "Mission Control");
   const gb=!GLOBAL.has(S.view)&&gitInfo()?.branch;
   $("tbSub").textContent = GLOBAL.has(S.view) ? "" : (gb ? `⑂ ${gb}  ·  ` : "") + (cp?.goal || cp?.path || "");
+}
+function qClock(ts){ const d=new Date(ts*1000), t=d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+  return d.toDateString()===new Date().toDateString()?t:d.toLocaleDateString([],{weekday:"short"})+" "+t; }
+function renderQuota(){
+  const q=S.quota, el=$("quota"); if(!el) return;
+  if(!q || !(Object.keys(q.windows||{}).length || q.rejected)){ if(changed("quota","")) el.innerHTML=""; return; }
+  const cfg=q.config, one=(k,label,name)=>{ const w=q.windows[k]; if(!w) return "";
+    const u=w.live&&w.utilization!=null?w.utilization*100:null, pc=u==null?0:Math.min(100,Math.round(u));
+    const col=u==null?"var(--mute)":u>=cfg.executor_pct?"var(--red)":u>=cfg.executor_pct-15?"var(--orange)":"var(--green)";
+    const tip=`${name} plan window${u==null?": reset since the last reading":`: ${pc}% used`}. Resets ${qClock(w.resets_at)}. New runs are held from ${cfg.executor_pct}%, the supervisor's automatic turns from ${cfg.supervisor_pct}%. Shared by every project.`;
+    return `<div class="qm" title="${esc(tip)}"><span>${label}</span><div class="qbar"><i style="width:${pc}%;background:${col}"></i></div><b>${u==null?"–":pc+"%"}</b></div>`; };
+  const pill=q.rejected?`<span class="qpill hard" title="The plan limit is reached. Runs start again by themselves.">Limit reached · back ${qClock(q.rejected.resets_at)}</span>`
+    :q.held?.on?`<span class="qpill" title="${esc(q.held.why)}">Runs held · ${qClock(q.held.resets_at)}</span>`:"";
+  const html=one("five_hour","5h","5-hour")+one("seven_day","7d","7-day")+pill;
+  if(changed("quota",html)) el.innerHTML=html;
 }
 function renderHeader(){
   const st=GLOBAL.has(S.view)?null:S.st; if(!st){ if(changed("header","")) $("hstats").innerHTML=""; return; }
@@ -1356,6 +1382,14 @@ async function todayAct(el){
   if(a==="rmcal") return todayPost("config",{config:{remove_calendar:id}});
   if(a==="rmdropped") return todayPost("config",{config:{remove_dropped:id}});
 }
+function quotaPanel(){
+  const q=S.quota; if(!q) return "";
+  const c=q.config, row=(id,label,hint,val)=>`<div class="lrow"><div><div style="font-weight:500;font-size:13.5px">${label}</div><div class="muted" style="font-size:12px">${hint}</div></div><select class="sel" id="${id}" data-quota="${id}" aria-label="${label}">${[50,60,70,75,80,85,90,95,100].concat(val).filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>a-b).map(v=>`<option value="${v}" ${v===val?"selected":""}>${v}% used</option>`).join("")}</select></div>`;
+  return `<div class="panel qcard"><div style="display:flex;align-items:center;justify-content:space-between"><div class="label">Plan limits</div><div class="toggle ${c.enabled?"on":""}" id="quotaT" role="switch" aria-checked="${c.enabled}"><small>Hold runs</small><div class="sw"></div></div></div>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px">Your Claude plan has a 5-hour and a 7-day limit, shared by every project. Near the limit, new runs wait and start by themselves after it resets. A run the limit cuts off isn't counted as an attempt. Executors stop earlier than the supervisor so it can still review their work.</p>
+    ${row("q-exec","Hold executors from","Applies to both windows.",c.executor_pct)}
+    ${row("q-sup","Hold the supervisor's automatic turns from","Your own messages still go through until the limit is reached.",c.supervisor_pct)}</div>`;
+}
 function limitsPanel(){
   const mi=S.st.mission, sup=S.st.supervisor||{};
   const sel=(id,label,hint,cur,opts,fmtOpt)=>{ const all=[...new Set([...opts,cur].filter(x=>x!==undefined&&x!==null))].sort((a,b)=>(a===0?-1:b===0?1:a-b));
@@ -1457,7 +1491,7 @@ function viewSettings(){
   const st=S.st; if(!st) return head("Settings","")+noMission();
   const sp=st.supervisor||{};
   return head("Settings","How agents work on this project. Notifications apply to every project.")+`<div class="settings">
-    <div>${accessPanel()}${limitsPanel()}
+    <div>${accessPanel()}${quotaPanel()}${limitsPanel()}
       <div class="panel qcard"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div class="label">Models and effort</div><button class="btn sm primary" id="saveModels">Save</button></div>
         <p class="muted" style="font-size:12.5px;margin:0 0 12px"><b>Effort</b> is how hard the model thinks before answering. Higher is more thorough on hard problems but slower and costlier.</p>
         ${modelPicker("md-", st.runners, {sr:sp.runner||"claude-supervisor", sm:sp.model||"", se:sp.effort||"", er:st.mission.default_executor||"claude", em:st.mission.executor_model||"", ee:st.mission.executor_effort||""})}</div></div>
@@ -1588,7 +1622,7 @@ async function refreshLog(){
 
 /* ───────── events ───────── */
 document.addEventListener("click", async e=>{
-  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-tpick],[data-tpickclear],[data-sintent],[data-tsend],[data-opench],[data-ms],#bringIn,[data-calday],[data-calmode],[data-calnav],[data-calgo],[data-calday-go],[data-ev],[data-evclose],[data-evtodo],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#runReady,[data-task]");
+  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-tpick],[data-tpickclear],[data-sintent],[data-tsend],[data-opench],[data-ms],#bringIn,[data-calday],[data-calmode],[data-calnav],[data-calgo],[data-calday-go],[data-ev],[data-evclose],[data-evtodo],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#quotaT,#runReady,[data-task]");
   if(!el) return;
   try{
     if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(S.view==="comms") S.chatBottom=true; if(!GLOBAL.has(S.view)){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
@@ -1679,6 +1713,7 @@ document.addEventListener("click", async e=>{
     if(el.id==="sendNote"){ const v=($("note-box")?.value||"").trim(); if(!v) return toast("Write a message first",true);
       await post("/api/note",{text:v}); S.drafts.note=""; $("note-box").value=""; toast("Sent. The supervisor reads it at its next step"); await tick(); return; }
     if(el.id==="closeD"||el.id==="scrim"){ closeDrawer(); return; }
+    if(el.id==="quotaT"){ const on=!S.quota.config.enabled; S.quota=await post("/api/quota",{enabled:on}).catch(()=>S.quota); toast(on?"New runs wait near the plan limit":"Runs are no longer held near the limit"); await tick(); return; }
     if(el.id==="autoT"){ const on=!S.st.mission.autopilot; await post("/api/autopilot",{on}); toast(on?"Autopilot on: ready tasks launch automatically":"Autopilot off"); await tick(); return; }
     if(el.id==="runReady"){ const r=await post("/api/run-ready",{}); toast(r.launched.length?"Launched "+r.launched.join(", "):"Nothing ready"); await tick(); return; }
     if(el.dataset.task){ openDrawer(el.dataset.task); return; }
@@ -1735,6 +1770,7 @@ document.addEventListener("change", async e=>{ const t=e.target;
   if(t.dataset?.nmaster!==undefined){ S.notify=await post("/api/notify",{enabled:t.checked}).catch(()=>S.notify); delete S.hashes.main; render(); return; }
   if(t.dataset?.nchan){ S.notify=await post("/api/notify",{channels:{[t.dataset.nchan]:{on:t.checked}}}).catch(e=>{toast(e.message); return S.notify;}); delete S.hashes.main; render(); return; }
   if(t.dataset?.nkind){ S.notify=await post("/api/notify",{kinds:{[t.dataset.nkind]:t.checked}}).catch(()=>S.notify); delete S.hashes.main; render(); return; }
+  if(t.dataset?.quota){ const v=Number(t.value); S.quota=await post("/api/quota",{[t.dataset.quota==="q-exec"?"executor_pct":"supervisor_pct"]:v}).catch(()=>S.quota); toast("Saved"); await tick(); return; }
   if(t.dataset?.limit){ const v=Number(t.value), k=t.dataset.limit, body={"lim-att":{max_attempts:v},"lim-bud":{budget:v},"lim-calls":{max_turns:v},"lim-sup":{sup_turns:v}}[k];
     await post("/api/limits",body).catch(()=>{}); toast("Limit saved"); await tick(); return; }
   if(t.dataset?.pick){ S.drafts[t.dataset.draft]=t.value; const sel=$(t.dataset.pick); if(sel){ S.drafts[t.dataset.pick]=""; S.drafts[t.dataset.pick.slice(0,-1)+"e"]=""; delete S.hashes.main; S.drafts[t.dataset.pick+"-x"]=""; renderPickerNow(t.dataset.pick.slice(0,3)); } }

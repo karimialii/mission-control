@@ -29,6 +29,7 @@ sys.path.insert(0, str(HERE))
 import compat  # noqa: E402
 compat.augment_path()
 import gitops  # noqa: E402
+import limits  # noqa: E402
 import notify  # noqa: E402
 import snapshots  # noqa: E402
 
@@ -47,6 +48,7 @@ STRIP_ENV = {"CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID", "
              "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_PID", "CLAUDE_CODE_HOST_SESSION_ID",
              "CLAUDE_CODE_SESSION_ATTENDED", "CLAUDE_CODE_TERMINAL_MCP_TOOLS", "CLAUDE_CODE_EXECPATH"}
 REPORT_RE = re.compile(r"<<<REPORT\s*(\{.*?\})\s*REPORT>>>", re.S)
+LIMIT_TEXT_RE = re.compile(r"hit your .{0,40}limit", re.I)  # "You've hit your session limit · resets 7:40pm (Europe/Oslo)"
 PROGRESS_RE = re.compile(r"PROGRESS:\s*(\d{1,3})\s*%?\s*(.*)")
 
 
@@ -390,6 +392,11 @@ def new_task(m: Mission, spec: dict, tid: str) -> dict:
 DEFAULT_MAX_ATTEMPTS = 3
 
 
+def attempts_used(t: dict) -> int:
+    """Attempts that count against the limit. A run the plan limit cut off says nothing about the task."""
+    return sum(1 for a in t.get("attempts", []) if not a.get("limit"))
+
+
 def attempt_cap(m: Mission, t: dict) -> int:
     """Attempts a task may use before someone has to decide: the mission limit plus any the user granted."""
     return int(m.meta().get("max_attempts") or DEFAULT_MAX_ATTEMPTS) + int(t.get("attempt_bonus") or 0)
@@ -405,7 +412,10 @@ def blocked_reason(m: Mission, t: dict) -> str:
     ms = next((x for x in (m.meta().get("milestones") or []) if x["id"] == t.get("milestone")), None)
     if ms and ms["status"] in ("planning", "awaiting_approval"):
         return f"{t['id']} belongs to {ms['id']}, whose plan isn't approved yet."
-    used, cap = len(t.get("attempts", [])), attempt_cap(m, t)
+    until = parse_ts(t.get("hold_until"))
+    if until and until > time.time():
+        return f"{t['id']} was cut off by the plan limit and restarts at {limits.clock(until)}."
+    used, cap = attempts_used(t), attempt_cap(m, t)
     if used >= cap:
         return f"{t['id']} has used {used} of {cap} attempts. Change something (model, brief, split it) and ask the user to allow more."
     perm = open_questions_for(m, t["id"], "permission")
@@ -421,7 +431,7 @@ def ensure_attempt_limit_cards(m: Mission) -> list:
     for t in m.tasks():
         if t["status"] not in ("todo", "needs_changes") or t.get("paused"):
             continue
-        used, cap = len(t.get("attempts", [])), attempt_cap(m, t)
+        used, cap = attempts_used(t), attempt_cap(m, t)
         if used < cap or open_questions_for(m, t["id"], "attempt_limit"):
             continue
         qid = m.next_id("Q", "questions")
@@ -551,9 +561,38 @@ def sandbox_settings(m: Mission) -> str:
     }})
 
 
+# What every run re-sends on each model call. A headless Claude loads the user's plugins, agents and
+# SessionStart hooks, and ~26 built-in tool schemas, none of which a task or supervisor turn uses
+# (~37k tokens, against ~10k with this). Set "lean_context": false in mission.json to turn it off.
+LEAN_TOOLS = SANDBOX_TOOLS + ",WebSearch,WebFetch"
+
+# Every call of a supervisor turn re-reads the whole chat, so past this many context tokens the next turn
+# starts a fresh session from STATE.md. Override per mission: "supervisor": {"max_context": N} in mission.json.
+SUPERVISOR_MAX_CONTEXT = 50000
+
+# Resuming after the prompt cache expired (about an hour) re-writes the whole context at full price, which costs
+# more than a fresh session from STATE.md once the context is big. Override: "supervisor": {"idle_fresh_minutes": N}
+# (0 = always resume).
+SUPERVISOR_IDLE_FRESH_MIN = 60
+SUPERVISOR_IDLE_FRESH_CTX = 20000
+
+
+def lean_claude(m: Mission, cmd: list) -> list:
+    """Keep the user's global Claude setup out of a run. Added here, not in runners.json, so a user's own
+    runners.json (which replaces `cmd` whole) can't bypass it. Flags already on the command win."""
+    if Path(cmd[0]).name not in ("claude", "claude.exe") or m.meta().get("lean_context") is False:
+        return cmd
+    if "--setting-sources" not in cmd:
+        cmd += ["--setting-sources", "project,local"]  # skips user-level plugins, agents and hooks
+    if "--tools" not in cmd:
+        cmd += ["--tools", LEAN_TOOLS]
+    return cmd
+
+
 def apply_permissions(m: Mission, cmd: list) -> list:
     """Add the project's access to a headless Claude command (its own settings.json is ignored in folders
     Claude hasn't been told to trust, so everything must travel on the command line)."""
+    cmd = lean_claude(m, cmd)
     extra = [x for x in perm_list(m) if perm_valid(x) and not x.startswith("Domain(")]
     if "--allowedTools" not in cmd:
         return cmd
@@ -929,7 +968,7 @@ def launch(m: Mission, tid: str, force: bool = False) -> int:
         if m.meta().get("phase") in GATED_PHASES:
             raise RuntimeError("the plan isn't approved yet (press Approve & launch, or `mc approve`)")
         attempt = len(t.get("attempts", [])) + 1
-        t.update(status="running", progress=0, step="starting", paused=False,
+        t.update(status="running", progress=0, step="starting", paused=False, hold_until=None,
                  run={"attempt": attempt, "started": now(), "pid": None, "executor": t["executor"]})
         m.save_task(t)
     logdir = m.dir / "runs" / tid
@@ -951,6 +990,25 @@ def launch(m: Mission, tid: str, force: bool = False) -> int:
     return p.pid
 
 
+def note_limit_hold(m: Mission, held: bool, why: str, resets) -> None:
+    """Tell the user once per hold (event + the waiting tasks' step) that launches wait for the plan limit."""
+    cur = (m.meta().get("limit_hold") or {}).get("resets_at")
+    want = resets if held else None
+    if cur == want:
+        return
+    with m.lock():
+        meta = m.meta()
+        meta["limit_hold"] = {"resets_at": want, "why": why} if held else None
+        m.save_meta(meta)
+    if held:
+        m.event("limit_hold", "system", why[:1].upper() + why[1:] + "; waiting tasks start by themselves afterwards", resets_at=resets)
+        for t in ready_tasks(m):
+            if not is_human(t):
+                m.update_task(t["id"], lambda x: x.update(step=why))
+    else:
+        m.event("limit_release", "system", "plan limit has room again; launching waiting tasks")
+
+
 def schedule(m: Mission) -> list:
     """Launch ready tasks up to the parallel limit. Returns launched ids.
     Serialised with its own lock file so concurrent schedulers can't overshoot max_parallel."""
@@ -964,10 +1022,12 @@ def schedule(m: Mission) -> list:
             tasks = m.tasks()
             running = sum(1 for t in tasks if t["status"] == "running" and not is_human(t))
             room = max(0, int(meta.get("max_parallel", 3)) - running)
+            held, why, resets = limits.hold("executor")
+            note_limit_hold(m, held, why, resets)
             launched = []
             for t in ready_tasks(m, tasks):  # ready_tasks already skips tasks at their attempt limit or awaiting permission
                 if not is_human(t):
-                    if room <= 0:
+                    if room <= 0 or held:
                         continue
                     room -= 1
                 try:
@@ -1048,6 +1108,8 @@ class StreamState:
         self.denied: list = []
         self.denied_raw: list = []
         self.on_result = None  # called the moment the CLI's final result event is parsed
+        self.limit_hit = None  # {window, resets_at} when this run was stopped by the plan limit
+        self.limit_text = ""
         self.calls: list = []
         self._call_by_id: dict = {}
         self._t0 = time.time()
@@ -1105,7 +1167,15 @@ class StreamState:
     def _claude(self, ev: dict) -> list:
         t = ev.get("type")
         out = []
+        if t == "rate_limit_event":
+            self.limit_hit = limits.record(ev.get("rate_limit_info")) or self.limit_hit
+            return out
         if t == "assistant":
+            msg = ev.get("message", {})
+            if msg.get("model") == "<synthetic>":  # Claude Code's own notice, not something the model wrote
+                for c in msg.get("content", []):
+                    if c.get("type") == "text" and LIMIT_TEXT_RE.search(c.get("text", "")):
+                        self.limit_text = c["text"]
             self._note_call(ev.get("message", {}))
             for c in ev.get("message", {}).get("content", []):
                 if c.get("type") == "text" and c.get("text", "").strip():
@@ -1175,6 +1245,16 @@ class StreamState:
         if self.parser == "text":
             self.texts.append("\n".join(self.raw))
         return []
+
+    def limit(self) -> dict | None:
+        """The plan limit this run ran into, as {window, resets_at}, or None."""
+        if self.limit_hit:
+            return self.limit_hit
+        if self.limit_text:
+            at = limits.parse_reset_text(self.limit_text)
+            limits.record_rejection(at)
+            return {"window": "five_hour", "resets_at": at or time.time() + limits.FALLBACK_WAIT}
+        return None
 
     def report(self) -> dict | None:
         for text in reversed(self.texts):
@@ -1413,16 +1493,51 @@ def estimate_cost(runner: dict, usage: dict):
             + usage.get("cache_write", 0) * price.get("cache_write", price.get("in", 0))) / 1e6
 
 
+def finalize_limit(m: Mission, tid: str, attempt: int, t: dict, limit: dict, usage: dict, cost, exact: bool,
+                   executor: str, calls: list | None, duration_s: float | None) -> None:
+    """The plan limit stopped this run. That says nothing about the task, so it is not an attempt, the supervisor
+    isn't asked to review it, and it starts again by itself once the limit resets."""
+    resets = float(limit.get("resets_at") or time.time() + limits.FALLBACK_WAIT)
+    until = datetime.fromtimestamp(resets, timezone.utc).isoformat(timespec="seconds")
+    step = f"paused: plan limit ({limits.LABEL.get(limit.get('window'), '5h')} window), restarts {limits.clock(resets)}"
+    (m.dir / "feedback").mkdir(exist_ok=True)
+    with open(m.dir / "feedback" / f"{tid}.md", "a") as fbf:
+        fbf.write(f"\n### Cut off by the plan limit ({now()})\nYour previous run was stopped by the usage limit, not because "
+                  "of a problem with your work. Whatever it saved is still in the working folder: look at what already exists, "
+                  "RESUME from there (don't redo finished work), and save your output after every item so another "
+                  "interruption loses nothing.\n")
+
+    def f(x):
+        add_tokens(x, usage, cost, exact)
+        x["status"], x["step"], x["hold_until"] = "todo", step, until
+        x.setdefault("attempts", []).append({
+            "n": attempt, "executor": executor or x.get("executor"), "started": (x.get("run") or {}).get("started"),
+            "finished": now(), "status": "limit", "limit": True, "usage": usage, "cost_usd": cost, "exact": exact,
+            "check": None, "error": "plan limit", "denied": [], "suggest": []})
+        x["run"] = {**(x.get("run") or {}), "pid": None, "finished": now()}
+    m.update_task(tid, f)
+    usage_add(m, {"kind": "executor", "task": tid, "title": t.get("title", ""), "attempt": attempt, "model": executor or t.get("executor"),
+                  "effort": (m.task(tid).get("run") or {}).get("effort", ""),
+                  "duration_s": round(duration_s, 1) if duration_s is not None else None,
+                  "input": usage.get("input", 0), "cache_read": usage.get("cache_read", 0), "cache_write": usage.get("cache_write", 0),
+                  "output": usage.get("output", 0), "cost_usd": float(cost or 0), "exact": bool(exact), "status": "limit",
+                  "outcome": "limit", "denied": 0, "calls": allocate_calls(calls or [], usage, cost)})
+    m.event("limit_hit", tid, f"{tid} was stopped by the plan limit; it restarts {limits.clock(resets)} and this attempt doesn't count",
+            task=tid, resets_at=resets)
+
+
 def finalize(m: Mission, tid: str, attempt: int, rep: dict | None, usage: dict, cost, exact: bool,
              fallback_text: str = "", error: str | None = None, executor: str = "", denied: list | None = None,
              workdir=None, commit: str | None = None, denied_raw: list | None = None, calls: list | None = None,
-             duration_s: float | None = None, commit_error: str | None = None) -> None:
+             duration_s: float | None = None, commit_error: str | None = None, limit: dict | None = None) -> None:
     """Shared by the runner and by manual `mc.py report`: store report, run check, set status."""
     t = m.task(tid)
     if t["status"] != "running" or (t.get("run") or {}).get("attempt") != attempt:
         # stopped or cancelled meanwhile: just keep the token accounting
         m.update_task(tid, lambda x: add_tokens(x, usage, cost, exact))
         return
+    if limit:
+        return finalize_limit(m, tid, attempt, t, limit, usage, cost, exact, executor, calls, duration_s)
     rep = dict(rep or {})
     no_report = not rep
     if no_report:
@@ -1548,9 +1663,9 @@ def finalize(m: Mission, tid: str, attempt: int, rep: dict | None, usage: dict, 
     tok_txt = f"{usage.get('input', 0) + usage.get('cache_read', 0) + usage.get('cache_write', 0):,} in / {usage.get('output', 0):,} out"
     m.event("report", tid, f"{tid} reported '{status}' · {short(summary, 120)} · {tok_txt}", task=tid, status=status)
     t_after = m.task(tid)
-    if new_status != "done" and len(t_after.get("attempts", [])) >= attempt_cap(m, t_after) and not perm_q \
+    if new_status != "done" and attempts_used(t_after) >= attempt_cap(m, t_after) and not perm_q \
             and not open_questions_for(m, tid, "attempt_limit"):
-        used = len(t_after["attempts"])
+        used = attempts_used(t_after)
         qid = m.next_id("Q", "questions")
         m.save_question({"id": qid, "task": tid, "from": "system", "to": "user", "kind": "attempt_limit", "extra": 2,
                          "question": f"{tid} has used all {used} attempts without finishing. Nothing will retry it automatically. "
@@ -1688,10 +1803,11 @@ def cmd_exec(args) -> None:
         except gitops.GitError as e:
             commit_err = str(e)
             error = (error + "; " if error else "") + f"commit failed: {e}"
+    hit = st.limit() if (error and not st.report()) else None  # a finished report beats a late limit warning
     finalize(m, tid, attempt, st.report(), st.usage, cost, st.exact,
              fallback_text=(st.texts[-1] if st.texts else ""), error=error, executor=model_label(rname, model), denied=st.denied,
              workdir=workdir, commit=sha, denied_raw=st.denied_raw, calls=st.calls, duration_s=time.time() - t_started,
-             commit_error=commit_err)
+             commit_error=commit_err, limit=hit)
 
 
 # ───────────────────────────── simulator executor ─────────────────────────────
@@ -1909,12 +2025,27 @@ def pending_user_messages(m: Mission) -> list:
     return [c for c in chat_log(m) if c["role"] == "user" and not c.get("delivered")]
 
 
+def supervisor_limit_hold(m: Mission, kind: str) -> bool:
+    """True while the plan limit says the supervisor must wait (say so once in the chat)."""
+    held, why, resets = limits.hold(kind)
+    note = (m.meta().get("supervisor") or {}).get("limit_note")
+    if held and note != resets:
+        sup_update(m, limit_note=resets)
+        chat_add(m, "system", f"The supervisor is waiting for the plan limit ({why}). Nothing is lost; it carries on by itself.")
+    elif not held and note:
+        sup_update(m, limit_note=None)
+    return held
+
+
 def wake_supervisor(m: Mission, kickoff: bool = False) -> bool:
     sup = m.meta().get("supervisor") or {}
     if sup.get("mode") != "dashboard":
         return False
     if sup.get("pid") and pid_alive(sup["pid"]):
         return False  # the running supervisor picks up queued messages before it exits
+    # Your own messages go through until the limit is actually reached; automatic wake-ups stop earlier.
+    if supervisor_limit_hold(m, "user" if kickoff or pending_user_messages(m) else "supervisor"):
+        return False
     p = subprocess.Popen([sys.executable, str(HERE / "mc.py"), "_supervise", str(m.root)] + (["--kickoff"] if kickoff else []),
                          cwd=str(m.root), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                          stderr=open(m.dir / "supervisor.err.txt", "a"), env=clean_env(), **compat.spawn_kwargs())
@@ -2058,14 +2189,15 @@ def run_supervisor_turn(m: Mission, message: str, trigger: str = "") -> dict:
     tok["cost_usd"] = round(tok.get("cost_usd", 0) + delta, 6)
     sup_update(m, turns=n, tokens=tok, session_id=(session_id or sup.get("session_id")) if resumable else None,
                context=last_ctx, step="", last_model=model_label(rname, model),
-               session_cost=total if resumable else 0.0, cost_model=2)
+               session_cost=total if resumable else 0.0, cost_model=2, last_turn=now())
     usage_add(m, {"kind": "supervisor", "turn": n, "model": model_label(rname, model), "effort": sup.get("effort") or "",
                   "trigger": trigger, "duration_s": round(t_took, 1), "input": st.usage.get("input", 0),
                   "cache_read": st.usage.get("cache_read", 0), "cache_write": st.usage.get("cache_write", 0),
                   "output": st.usage.get("output", 0), "cost_usd": delta, "exact": bool(st.exact), "context": last_ctx,
                   "fresh_session": not same_session, "calls": allocate_calls(st.calls, st.usage, delta)})
-    return {"reply": reply, "code": code, "error": st.error if (st.error or code) else None, "context": last_ctx,
-            "denied": st.denied, "denied_raw": st.denied_raw, "cost": delta}
+    hit = st.limit()
+    return {"reply": "" if hit else reply, "code": code, "error": st.error if (st.error or code) else None, "context": last_ctx,
+            "denied": st.denied, "denied_raw": st.denied_raw, "cost": delta, "limit": hit}
 
 
 def fix_supervisor_costs(m: Mission) -> bool:
@@ -2152,14 +2284,29 @@ def cmd_supervise(a) -> None:
                     chat_add(m, "system", f"Auto-supervision paused after {cap} turns without you. Send a message to continue.")
                     break
                 sup_update(m, auto_turns=auto)
+            idle_min = int(sup.get("idle_fresh_minutes", SUPERVISOR_IDLE_FRESH_MIN))
+            last = parse_ts(sup.get("last_turn"))
+            if (sup.get("session_id") and idle_min and last and time.time() - last > idle_min * 60
+                    and int(sup.get("context") or 0) > SUPERVISOR_IDLE_FRESH_CTX):
+                (m.dir / "STATE.md").write_text(state_text(m))
+                sup = sup_update(m, session_id=None)
+                chat_add(m, "system", f"The supervisor was idle over {idle_min} minutes, so this turn starts a fresh session "
+                                      "from STATE.md (cheaper than re-reading the old chat).")
             fresh = not sup.get("session_id")
             msg = compose_turn(m, pending, events, kickoff, fresh)
             trig = ("kickoff" if kickoff else "your message: " + short(pending[0]["text"], 90) if pending else
                     f"{len(events)} update(s): " + ", ".join(sorted({e['kind'] for e in events})))
             res = run_supervisor_turn(m, msg, trig)
-            if res.get("error") and sup.get("session_id") and not res.get("reply"):
+            if res.get("error") and sup.get("session_id") and not res.get("reply") and not res.get("limit"):
                 sup_update(m, session_id=None)  # resume failed: start a fresh session from STATE
                 res = run_supervisor_turn(m, compose_turn(m, pending, events, kickoff, True), trig + " (fresh session)")
+            if res.get("limit"):
+                # The plan limit refused the turn. Leave the messages undelivered and the events unread: the next turn gets them.
+                at = float(res["limit"].get("resets_at") or 0)
+                sup_update(m, limit_note=at)
+                chat_add(m, "system", f"The plan limit stopped the supervisor. Your messages and the updates are kept, "
+                                      f"and it carries on by itself at {limits.clock(at)}.")
+                break
             chat_mark_delivered(m, {c["id"] for c in pending})
             if cursor_target is not None and (res.get("reply") or not res.get("error")):
                 supervisor_cursor_commit(m, cursor_target)
@@ -2174,7 +2321,7 @@ def cmd_supervise(a) -> None:
                 made = request_supervisor_permission(m, res.get("denied_raw") or [], res["denied"])
                 chat_add(m, "system", "Supervisor was denied: " + "; ".join(res["denied"][:3])
                          + (f". I've asked you under Decisions waiting on you ({made}): Allow or Don't allow." if made else ""))
-            if res.get("context", 0) > int(sup.get("max_context", 120000)):
+            if res.get("context", 0) > int(sup.get("max_context", SUPERVISOR_MAX_CONTEXT)):
                 (m.dir / "STATE.md").write_text(state_text(m))
                 sup_update(m, session_id=None)
                 chat_add(m, "system", "Supervisor context got large, so the next turn starts a fresh session from STATE.md (saves tokens).")
@@ -3385,6 +3532,30 @@ def cmd_limits(a):
     print(f"supervisor turns w/o you: {(meta.get('supervisor') or {}).get('max_auto_turns', 40)}")
 
 
+def cmd_quota(a):
+    """The Claude plan limits (5-hour and 7-day windows). Shared by all projects, so not per mission."""
+    changing = any(x is not None for x in (a.executor, a.supervisor)) or a.on or a.off
+    if changing:
+        if os.environ.get("MC_ROLE") == "supervisor":
+            die("plan-limit settings are the user's to change. Ask them in chat.")
+        for v in (a.executor, a.supervisor):
+            if v is not None and not 1 <= v <= 100:
+                die("percentages must be between 1 and 100")
+        limits.set_config(executor_pct=a.executor, supervisor_pct=a.supervisor, enabled=False if a.off else (True if a.on else None))
+    snap = limits.snapshot()
+    cfg = snap["config"]
+    print(f"holding back new runs: {'on' if cfg['enabled'] else 'OFF'}  (executors from {cfg['executor_pct']}%, supervisor from {cfg['supervisor_pct']}%)")
+    if not snap["windows"]:
+        print("no reading yet: it appears after the first Claude run")
+    for name in limits.WINDOWS:
+        w = snap["windows"].get(name)
+        if w:
+            val = f"{w['utilization'] * 100:.0f}% used" if w["live"] else "reset since the last reading"
+            print(f"{limits.LABEL[name]:>3} window: {val:<28} resets {limits.clock(w['resets_at'])}")
+    if snap["rejected"]:
+        print(f"LIMIT REACHED ({limits.LABEL.get(snap['rejected']['window'], '')}): runs resume {limits.clock(snap['rejected']['resets_at'])}")
+
+
 def cmd_notify(a):
     """Where and when Mission Control pings you. Global, not per project (the supervisor may not change it)."""
     cfg = notify.load()
@@ -3702,6 +3873,12 @@ def main(argv=None):
     s.add_argument("--fail-if-gone", action="append", metavar="PATTERN", help="fire as FAILED if the process disappears before the main condition is met")
     s.add_argument("--every", type=int, default=60, help="seconds between checks (min 15)"); s.add_argument("--hours", type=float, default=24, help="give up after this long")
     s.add_argument("--task"); s.add_argument("--note", nargs="*", help="what you plan to do when it fires"); s.set_defaults(fn=cmd_watch)
+    s = sub.add_parser("quota", help="Claude plan limits (5h / 7d): show usage, set when new runs are held back")
+    s.add_argument("--executor", type=int, metavar="PCT", help="hold new executor runs from this window usage (default 85)")
+    s.add_argument("--supervisor", type=int, metavar="PCT", help="hold automatic supervisor turns from this usage (default 95)")
+    s.add_argument("--on", action="store_true", help="hold runs near the limit")
+    s.add_argument("--off", action="store_true", help="never hold runs (a limit that is actually reached still pauses them)")
+    s.set_defaults(fn=cmd_quota)
     s = sub.add_parser("limits", help="safety limits: attempts per task, budget and model calls per executor run")
     s.add_argument("--max-attempts", type=int); s.add_argument("--executor-budget", type=float, help="USD per executor run (0 = no cap)")
     s.add_argument("--executor-calls", type=int, help="max model calls per executor run (0 = no cap)")

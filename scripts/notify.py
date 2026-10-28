@@ -31,6 +31,7 @@ KINDS = {
     "complete": "Every task in a mission is done",
     "watch": "A watched external job finished or failed",
     "reminder": "A reminder on your Today page is due",
+    "limit": "The Claude plan limit is close, so new runs are held back",
 }
 DEFAULT = {
     "enabled": True,
@@ -120,6 +121,8 @@ def classify(ev: dict) -> str | None:
         return "failure"
     if kind == "watch":
         return "watch"
+    if kind == "limit_hold":  # once per hold, not once per task that was cut off
+        return "limit"
     return None
 
 
@@ -152,6 +155,7 @@ def titled(m, kind: str, ev: dict) -> tuple[str, str]:
         "failure": f"{name}: something failed",
         "complete": f"{name}: all tasks are done",
         "watch": f"{name}: a watched job finished",
+        "limit": f"{name}: waiting for the plan limit",
     }[kind]
     return title, msg
 

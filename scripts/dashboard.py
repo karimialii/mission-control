@@ -22,6 +22,7 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import compat  # noqa: E402
+import limits  # noqa: E402
 import mc  # noqa: E402
 import today  # noqa: E402
 
@@ -277,6 +278,14 @@ def supervisor_loop() -> None:
         time.sleep(2)
 
 
+def quota_state() -> dict:
+    """The plan limits for the header meters: both windows, the thresholds, and whether runs are held back right now."""
+    snap = limits.snapshot()
+    held, why, resets = limits.hold("executor")
+    snap["held"] = {"on": held, "why": why, "resets_at": resets}
+    return snap
+
+
 def today_send(body: dict) -> dict:
     """Send picked to-dos to the supervisor of the project they belong to."""
     path = str(body.get("project") or "")
@@ -380,6 +389,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"clone_dir": str(default_clone_dir()).replace(str(Path.home()), "~", 1)})
             if u.path == "/api/notify":
                 return self._send(200, mc.notify.masked())
+            if u.path == "/api/quota":
+                return self._send(200, quota_state())
             if u.path == "/api/info":
                 return self._send(200, {"app": "mission-control", "pid": os.getpid(), "started": STARTED})
             if u.path == "/api/calendar":
@@ -457,6 +468,20 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, mc.notify.masked())
             if u.path.startswith("/api/today/"):
                 return self._send(200, today_post(u.path.rsplit("/", 1)[1], body))
+            if u.path == "/api/quota":
+                def pct(k):
+                    v = body.get(k)
+                    if v is None:
+                        return None
+                    if not isinstance(v, (int, float)) or isinstance(v, bool) or not 1 <= v <= 100:
+                        raise ValueError("percentages must be between 1 and 100")
+                    return int(v)
+                try:
+                    limits.set_config(executor_pct=pct("executor_pct"), supervisor_pct=pct("supervisor_pct"),
+                                      enabled=body["enabled"] if isinstance(body.get("enabled"), bool) else None)
+                except ValueError as e:
+                    return self._send(400, {"error": str(e)})
+                return self._send(200, quota_state())
             if u.path == "/api/notify-test":
                 cfg = mc.notify.load()
                 res = mc.notify.send(cfg, "Mission Control test", "If you can read this, notifications work.", "test", wait=True)
