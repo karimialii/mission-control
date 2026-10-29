@@ -775,6 +775,7 @@ function renderHeader(){
     <div class="chip opt-hide"><small>Cost</small><span>${money(cost)}</span></div>
     <div class="toggle ${st.mission.autopilot?"on":""}" id="autoT" role="switch" aria-checked="${!!st.mission.autopilot}" title="Autopilot: launch tasks as soon as their dependencies are done"><small>Autopilot</small><div class="sw"></div></div>
     <button class="btn" data-reveal="mission" title="Open the mission folder (reports, feedback, run logs) in Finder">Open folder</button>
+    <button class="btn" id="openVsc" title="Open the project folder in VS Code">Open VS Code</button>
     <button class="btn primary" id="runReady" ${st.ready.length&&!gated?"":"disabled"}>Run Ready${st.ready.length?` (${st.ready.length})`:""}</button>`;
   if(changed("header",html)) $("hstats").innerHTML = html;
 }
@@ -1622,7 +1623,7 @@ async function refreshLog(){
 
 /* ───────── events ───────── */
 document.addEventListener("click", async e=>{
-  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-tpick],[data-tpickclear],[data-sintent],[data-tsend],[data-opench],[data-ms],#bringIn,[data-calday],[data-calmode],[data-calnav],[data-calgo],[data-calday-go],[data-ev],[data-evclose],[data-evtodo],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#quotaT,#runReady,[data-task]");
+  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-tpick],[data-tpickclear],[data-sintent],[data-tsend],[data-opench],[data-ms],#bringIn,[data-calday],[data-calmode],[data-calnav],[data-calgo],[data-calday-go],[data-ev],[data-evclose],[data-evtodo],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#quotaT,#runReady,#openVsc,[data-task]");
   if(!el) return;
   try{
     if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(S.view==="comms") S.chatBottom=true; if(!GLOBAL.has(S.view)){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
@@ -1640,6 +1641,7 @@ document.addEventListener("click", async e=>{
     if(el.dataset.ufilter){ S.usageFilter=S.usageFilter===el.dataset.ufilter&&el.dataset.ufilter!=="all"?"all":el.dataset.ufilter; render(); document.querySelector(".ulist:last-of-type")?.scrollIntoView?.({block:"nearest"}); return; }
     if(el.dataset.uopen){ const id=el.dataset.uopen; if(S.usageOpen.has(id)) S.usageOpen.delete(id); else { S.usageOpen.add(id); if(!S.usageCalls[id]) api(`/api/usage-calls?p=${encodeURIComponent(S.cur)}&id=${encodeURIComponent(id)}`).then(r=>{ S.usageCalls[id]=r.calls; render(); }).catch(()=>{}); } render(); return; }
     if(el.dataset.wcancel){ await post("/api/watch-cancel",{id:el.dataset.wcancel}); toast("Stopped waiting"); await tick(); return; }
+    if(el.id==="openVsc"){ await post("/api/open-vscode",{}); toast("Opened in VS Code"); return; }
     if(el.dataset.reveal){ const r=await post("/api/reveal",{what:el.dataset.reveal,t:S.drawer}); toast("Opened in Finder"); return; }
     if(el.dataset.remove){ e.stopPropagation(); e.preventDefault(); const p=S.projects.find(x=>x.path===el.dataset.remove); if(!p) return;
       const busy=(p.counts?.running||0), warn=busy||p.supervisor?.running?`\n\nHeads up: ${busy?busy+" task"+(busy>1?"s are":" is")+" still running":"the supervisor is working"}. ${busy?"They":"It"} will finish, but nothing will manage ${busy?"them":"it"} while it's off the dashboard.`:"";

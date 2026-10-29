@@ -246,6 +246,17 @@ def reveal(target: Path) -> bool:
     return True
 
 
+def open_in_vscode(target: Path) -> bool:
+    """Open a folder in VS Code. False if VS Code can't be found."""
+    code = shutil.which("code")
+    if code:
+        subprocess.Popen([code, str(target)], shell=IS_WIN)  # `code` is a .cmd shim on Windows
+        return True
+    if sys.platform == "darwin":
+        return subprocess.run(["open", "-a", "Visual Studio Code", str(target)], capture_output=True).returncode == 0
+    return False
+
+
 def resolve_exe(cmd: list) -> list:
     """Find the program on PATH. On Windows, refuse .cmd/.bat wrappers: cmd.exe would re-parse the prompt in the arguments."""
     if not IS_WIN:

@@ -570,6 +570,10 @@ class Handler(BaseHTTPRequestHandler):
                 if not compat.reveal(target):
                     return self._send(400, {"error": "can't open folders on this system", "path": str(target)})
                 return self._send(200, {"ok": True, "path": str(target)})
+            elif u.path == "/api/open-vscode":
+                if not compat.open_in_vscode(m.root):
+                    return self._send(400, {"error": "couldn't find VS Code (install it, or add the `code` command to PATH)", "path": str(m.root)})
+                return self._send(200, {"ok": True, "path": str(m.root)})
             elif u.path == "/api/watch-cancel":
                 w = next((x for x in mc.watch_list(m) if x["id"] == str(body.get("id"))), None)
                 if w and w.get("status") == "active":
