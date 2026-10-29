@@ -923,10 +923,10 @@ function viewPhases(){
   svg+=`</svg>`;
   const levels=Object.keys(phases).map(Number).sort((a,b)=>a-b);
   const strip=levels.map(l=>{ const ts_=phases[l], d=ts_.filter(t=>t.status==="done").length;
-    return `<div class="panel phase-chip"><div class="label">Phase ${l+1}</div><div style="display:flex;align-items:baseline;gap:8px;margin-top:2px"><span class="n">${d}/${ts_.length}</span><span class="muted" style="font-size:12px">done</span></div><div class="bar"><i style="width:${d/ts_.length*100}%;background:var(--green)"></i></div></div>`; }).join("");
+    return `<div class="panel phase-chip"><div class="label">Phase ${l+1}</div><div style="display:flex;align-items:baseline;gap:8px;margin-top:2px"><span class="n">${d}/${ts_.length}</span><span class="muted" style="font-size:12px">done</span></div><div class="bar"><i style="width:${d/ts_.length*100}%;background:var(--green)"></i></div>${(()=>{ const ai=ts_.filter(t=>aiTask(t)&&!["done","cancelled"].includes(t.status)); if(!ai.length) return ""; return `<label class="muted" style="font-size:12px;display:flex;gap:6px;margin-top:6px;cursor:pointer"><input type="checkbox" data-phrev="${ai.map(t=>t.id).join(",")}" ${ai.every(isUserRev)?"checked":""}>I'll review this phase</label>`; })()}</div>`; }).join("");
   return head("Timeline", "Tasks that can run in parallel start together. Dependent tasks start after the tasks they wait for.",
       `<div class="gstats"><span class="tag">${tasks.length} tasks</span><span class="tag">${levels.length} phases</span><span class="tag">up to ${maxPar} in parallel</span><span class="tag" style="color:var(--crit)">critical path: ${crit.size} tasks</span></div>`)
-    + approveBanner() + prBanner() + folderBanner() + msBar(st) + `<div class="phase-strip">${strip}</div><div class="panel gantt-wrap">${svg}</div>
+    + approveBanner() + reviewQueue() + prBanner() + folderBanner() + msBar(st) + `<div class="phase-strip">${strip}</div><div class="panel gantt-wrap">${svg}</div>
     <div class="legend">${STATUS.map(s=>`<span><i style="background:${SCOL(s)}"></i>${SLABEL[s]}</span>`).join("")}<span><i style="background:var(--crit)"></i>Critical path</span><span>Columns are estimate points</span></div>`;
 }
 const cssCache={}; function getCss(v){ return cssCache[v] ??= (getComputedStyle(document.documentElement).getPropertyValue(v).trim().startsWith("var(") ? getCss(getComputedStyle(document.documentElement).getPropertyValue(v).trim().slice(4,-1)) : getComputedStyle(document.documentElement).getPropertyValue(v).trim()); }
@@ -937,13 +937,13 @@ function viewBoard(){
   const st=S.st; if(!st) return head("Board","")+noMission();
   const deps = t => (t.depends_on||[]).filter(d=>st.tasks.find(x=>x.id===d)?.status!=="done");
   const bt=msTasks(st,true);
-  return head("Board", "Every task by status. Open a card for its live transcript, report and tokens.") + folderBanner() + msBar(st,true) + `<div class="board">` + STATUS.map(s=>{
+  return head("Board", "Every task by status. Open a card for its live transcript, report and tokens.") + reviewQueue() + folderBanner() + msBar(st,true) + `<div class="board">` + STATUS.map(s=>{
     const items=bt.filter(t=>t.status===s);
     return `<div class="panel col"><div class="col-h"><b><i class="cdot" style="background:${SCOL(s)}"></i>${SLABEL[s]}</b><span>${items.length}</span></div>` + items.map(t=>{
       const waiting=deps(t), ready=st.ready.includes(t.id);
       return `<div class="card ${t.status}" data-task="${t.id}">
         <div class="id">${t.id}${t.paused?' <span class="muted">· paused</span>':""}</div><h4>${esc(t.title)}</h4>
-        <div class="meta">${execTag(t)}<span class="tag">⏱ ${t.estimate}</span>${(t.tokens?.cost_usd)?`<span class="tag">${money(t.tokens.cost_usd)}</span>`:""}${t.attempts?.length>1?(()=>{ const cap=(st.mission.max_attempts||3)+(t.attempt_bonus||0), n=t.attempts.length; return `<span class="tag" style="${n>=cap?"color:var(--orange)":""}">try ${n}/${cap}</span>`; })():""}</div>
+        <div class="meta">${execTag(t)}${isUserRev(t)?'<span class="tag" style="color:var(--purple)">you review</span>':""}<span class="tag">⏱ ${t.estimate}</span>${(t.tokens?.cost_usd)?`<span class="tag">${money(t.tokens.cost_usd)}</span>`:""}${t.attempts?.length>1?(()=>{ const cap=(st.mission.max_attempts||3)+(t.attempt_bonus||0), n=t.attempts.length; return `<span class="tag" style="${n>=cap?"color:var(--orange)":""}">try ${n}/${cap}</span>`; })():""}</div>
         ${t.status==="running"?(t.executor==="human"?`<div class="step">${esc(t.step||"")}</div>`:`<div class="step">› ${esc(t.step||"…")}</div><div class="bar"><i style="width:${t.progress||0}%"></i></div>`):""}
         ${t.status==="blocked"||t.status==="review"?`<div class="step">› ${esc(t.step||"")}</div>`:""}
         ${waiting.length&&s!=="done"?`<div class="step">⧗ waits for ${waiting.join(", ")}</div>`:""}
@@ -1079,18 +1079,33 @@ function permRows(list,checks){
   return `<div class="pc-list">${list.map(p=>`<div class="pr"><div class="pr-top"><label>${checks?`<input type="checkbox" class="pp-chk" data-rule="${esc(p.rule)}" checked>`:""}${esc(p.label)}</label>${riskPill(p.level)}</div>
     <code>${esc(p.rule)}</code>${p.why?`<div class="muted" style="font-size:12px">${esc(p.why)}</div>`:""}${p.outside?`<div class="pr-risk" style="color:var(--orange);font-weight:600">⚠ Runs outside the sandbox</div>`:""}<div class="pr-risk">${esc(p.risk)}</div></div>`).join("")}</div>`;
 }
+const aiTask=t=>t.executor!=="human";
+const isUserRev=t=>aiTask(t)&&t.reviewer==="user";
+function reviewQueue(){
+  const st=S.st; if(!st) return "";
+  const mine=st.tasks.filter(t=>t.status==="review"&&isUserRev(t));
+  const asks=st.tasks.filter(t=>t.review_suggest?.state==="pending"&&t.status==="review"&&!isUserRev(t)&&aiTask(t));
+  if(!mine.length&&!asks.length) return "";
+  return `<div class="panel approve"><div><div class="label" style="color:var(--purple)">Needs your review</div>
+    ${mine.map(t=>`<div style="margin-top:6px"><span class="tag" data-task="${t.id}" style="cursor:pointer">${t.id}</span> ${esc(t.title)} <button class="btn sm primary" data-task="${t.id}">Review</button></div>`).join("")}
+    ${asks.map(t=>`<div style="margin-top:6px"><span class="tag" data-task="${t.id}" style="cursor:pointer">${t.id}</span> ${esc(t.title)}<div class="muted" style="font-size:12.5px">Supervisor suggests you review this: ${esc(t.review_suggest.reason)}</div>
+      <button class="btn sm primary" data-rsug="accept" data-t="${t.id}">I'll review it</button> <button class="btn sm" data-rsug="decline" data-t="${t.id}">You decide</button></div>`).join("")}
+  </div></div>`;
+}
 function approveBanner(){
   const st=S.st; if(!st) return "";
   const waiting=msAll(st).filter(x=>x.status==="awaiting_approval");
   if(st.mission.phase!=="awaiting_approval"&&!waiting.length) return "";
   const ids=new Set(waiting.map(x=>x.id)), pt=waiting.length?st.tasks.filter(t=>ids.has(t.milestone||"M1.1")&&t.status!=="cancelled"):st.tasks.filter(t=>t.status!=="cancelled");
+  const sugg=pt.filter(t=>t.review_suggest?.state==="pending"&&aiTask(t));
+  const suggHtml=sugg.length?`<div style="margin-top:10px"><div class="label">Supervisor suggests you review these reports</div>${sugg.map(t=>`<div style="margin-top:6px"><b>${t.id}</b> ${esc(t.title)}<div class="muted" style="font-size:12.5px">${esc(t.review_suggest.reason)}</div><button class="btn sm primary" data-rsug="accept" data-t="${t.id}">I'll review it</button> <button class="btn sm" data-rsug="decline" data-t="${t.id}">Keep with supervisor</button></div>`).join("")}</div>`:"";
   const n=pt.length, ph=new Set(pt.map(t=>t.phase)).size, pp=st.plan_permissions||[];
   const prev=waiting.map(w=>msAll(st).filter(x=>x.wp===w.wp&&x.status==="done").pop()).filter(Boolean);
   const which=msMany(st)&&waiting.length?`<div style="font-size:13px;margin-top:6px">${waiting.map(w=>`<b>${esc(w.id)} ${esc(w.title)}</b>${w.goal?" · "+esc(w.goal):""}`).join("<br>")}</div>`+
     (prev.length?`<details style="margin-top:6px"><summary class="muted" style="font-size:12.5px;cursor:pointer">What the previous milestone found</summary>${prev.map(x=>`<div style="font-size:12.5px;margin-top:4px"><b>${esc(x.id)}</b> ${md(x.outcome||"")}</div>`).join("")}</details>`:""):"";
   return `<div class="panel approve"><div><div class="label" style="color:var(--cyan)">Plan ready for launch</div>
-    <div style="font-size:15px;font-weight:600;margin-top:4px">${n} tasks · ${ph} phase${ph>1?"s":""} · nothing runs until you approve</div>${which}
-    <div class="muted" style="font-size:12.5px">Check the timeline in <a href="#" data-view="phases">Phases</a>. Want changes? Just tell the supervisor in chat.</div></div>
+    <div style="font-size:15px;font-weight:600;margin-top:4px">${n} tasks · ${ph} phase${ph>1?"s":""} · nothing runs until you approve</div>${which}${suggHtml}
+    <div class="muted" style="font-size:12.5px;margin-top:10px">Check the timeline in <a href="#" data-view="phases">Phases</a>. Want changes? Just tell the supervisor in chat.</div></div>
     <button class="btn primary launch" id="approveBtn">✓ ${pp.length?"Approve, allow & launch":"Approve & launch"}</button>
     ${pp.length?`<div class="approve-perms"><div class="label">This plan needs ${pp.length} permission${pp.length>1?"s":""} · untick any you don't want to give</div>${permRows(pp,true)}</div>`:""}</div>`;
 }
@@ -1600,6 +1615,10 @@ async function renderDrawer(){
      ${t.executor==="human"?`<div class="sec person-box">${avatar(t.assignee,40)}<div style="flex:1;min-width:0"><div style="font-weight:600">@${esc(t.assignee)}</div><div class="muted" style="font-size:12.5px">${esc(t.step||"Not handed off yet")}</div></div>${t.github?.issue_url?`<a class="btn sm" href="${esc(t.github.issue_url)}" target="_blank" rel="noopener">Issue #${t.github.issue} ↗</a>`:""}${t.github?.pr?.url?`<a class="btn sm" href="${esc(t.github.pr.url)}" target="_blank" rel="noopener">PR #${t.github.pr.number} ↗</a>`:""}</div>`:""}
      <div class="sec"><div class="label">Goal</div><div>${esc(t.goal||"—")}</div></div>
      ${t.accept?.length?`<div class="sec"><div class="label">Acceptance criteria</div><ul>${t.accept.map(a=>`<li>${esc(a)}</li>`).join("")}</ul></div>`:""}
+     ${aiTask(t)&&!["done","cancelled"].includes(t.status)?`<div class="sec"><div class="label">Who reviews the report</div><select class="sel" id="revSel" data-t="${t.id}"><option value="supervisor" ${isUserRev(t)?"":"selected"}>Supervisor</option><option value="user" ${isUserRev(t)?"selected":""}>Me</option></select></div>`:""}
+     ${t.status==="review"&&isUserRev(t)?`<div class="sec" style="border:1px solid var(--purple);border-radius:10px;padding:12px"><div class="label" style="color:var(--purple)">Your review</div>
+       <textarea id="revMsg" class="inp" rows="4" data-draft="rev-${t.id}" style="width:100%;margin:8px 0" placeholder="Your feedback (required to request changes)">${esc(S.drafts["rev-"+t.id]||"")}</textarea>
+       <button class="btn sm primary" data-rv="approve" data-t="${t.id}">✓ Approve</button> <button class="btn sm danger" data-rv="changes" data-t="${t.id}">Request changes</button></div>`:""}
      <div class="sec"><div class="label">Wiring</div><div style="display:flex;gap:6px;flex-wrap:wrap">${(t.depends_on||[]).map(d=>`<span class="tag" data-task="${d}" style="cursor:pointer;color:${SCOL(by[d]?.status)}">← ${d}</span>`).join("")||'<span class="muted">no dependencies</span>'}${S.st.tasks.filter(x=>(x.depends_on||[]).includes(t.id)).map(x=>`<span class="tag" data-task="${x.id}" style="cursor:pointer">→ ${x.id}</span>`).join("")}${t.check?`<span class="tag">check: ${esc(t.check)}</span>`:""}${(t.files||[]).map(f=>`<span class="tag">${esc(f)}</span>`).join("")}</div></div>
      ${t.executor==="human"?"":`<div class="sec"><div class="label">Tokens</div><div class="mono" style="font-size:12.5px">${fmt(tk.input)} in · ${fmt(tk.cache_read)} cache read · ${fmt(tk.cache_write)} cache write · ${fmt(tk.output)} out · <b style="color:var(--lime)">${money(tk.cost_usd)}</b> <span class="muted">(${tk.source||"none"})</span></div></div>`}
 ${t.executor==="human"?"":`     <div class="sec"><div style="display:flex;align-items:center;gap:10px"><div class="label">Session transcript</div>${nAtt>1?`<select class="sel" id="attSel">${Array.from({length:nAtt},(_,i)=>`<option value="${i+1}" ${i+1===cur?"selected":""}>attempt ${i+1}</option>`).join("")}</select>`:""}<span class="muted mono" style="font-size:11px;margin-left:auto">read-only · fresh chat per attempt</span></div>
@@ -1623,7 +1642,7 @@ async function refreshLog(){
 
 /* ───────── events ───────── */
 document.addEventListener("click", async e=>{
-  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-tpick],[data-tpickclear],[data-sintent],[data-tsend],[data-opench],[data-ms],#bringIn,[data-calday],[data-calmode],[data-calnav],[data-calgo],[data-calday-go],[data-ev],[data-evclose],[data-evtodo],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#quotaT,#runReady,#openVsc,[data-task]");
+  const el=e.target.closest("[data-view],[data-ignite],[data-proj],[data-act],[data-answer],[data-answer-text],[data-filter],[data-remove],[data-reveal],[data-wcancel],[data-uscope],[data-uproj],[data-uopen],[data-ufilter],#sendChat,#saveModels,#addPerm,[data-tact],#jumpChat,[data-tpick],[data-tpickclear],[data-sintent],[data-tsend],[data-opench],[data-ms],#bringIn,[data-calday],[data-calmode],[data-calnav],[data-calgo],[data-calday-go],[data-ev],[data-evclose],[data-evtodo],[data-rmdom],#addDom,#resetDom,#clearBash,[data-snap],[data-restore],#snapNow,[data-nsave],#notifyTest,[data-rmperm],#ccCopy,#sideAdd,#prBtn,#copyBrief,#markDone,#addBtn,#approveBtn,#supReset,#supTake,#closeD,#scrim,#autoT,#quotaT,#runReady,#openVsc,[data-rv],[data-rsug],[data-phrev],[data-task]");
   if(!el) return;
   try{
     if(el.dataset.view){ e.preventDefault(); S.view=el.dataset.view; lsSet("mc.view",S.view); if(S.view==="comms") S.chatBottom=true; if(!GLOBAL.has(S.view)){ S.lastView=S.view; lsSet("mc.lastview",S.view); } if(S.view==="tokens") await loadUsage(); render(); return; }
@@ -1641,6 +1660,13 @@ document.addEventListener("click", async e=>{
     if(el.dataset.ufilter){ S.usageFilter=S.usageFilter===el.dataset.ufilter&&el.dataset.ufilter!=="all"?"all":el.dataset.ufilter; render(); document.querySelector(".ulist:last-of-type")?.scrollIntoView?.({block:"nearest"}); return; }
     if(el.dataset.uopen){ const id=el.dataset.uopen; if(S.usageOpen.has(id)) S.usageOpen.delete(id); else { S.usageOpen.add(id); if(!S.usageCalls[id]) api(`/api/usage-calls?p=${encodeURIComponent(S.cur)}&id=${encodeURIComponent(id)}`).then(r=>{ S.usageCalls[id]=r.calls; render(); }).catch(()=>{}); } render(); return; }
     if(el.dataset.wcancel){ await post("/api/watch-cancel",{id:el.dataset.wcancel}); toast("Stopped waiting"); await tick(); return; }
+    if(el.dataset.rv){ const msg=(S.drafts["rev-"+el.dataset.t]??$("revMsg")?.value??"").trim();
+      if(el.dataset.rv==="changes"&&!msg){ toast("Write what should change", true); return; }
+      try{ await post("/api/review",{t:el.dataset.t,verdict:el.dataset.rv,message:msg}); delete S.drafts["rev-"+el.dataset.t]; toast(el.dataset.rv==="approve"?"Approved":"Sent back with your feedback"); }
+      catch(err){ return; }
+      delete S.hashes.drawer; await tick(); return; }
+    if(el.dataset.rsug){ await post("/api/review-suggest",{t:el.dataset.t,accept:el.dataset.rsug==="accept"}); toast(el.dataset.rsug==="accept"?"You'll review it":"Supervisor will decide"); delete S.hashes.drawer; await tick(); return; }
+    if(el.dataset.phrev){ await post("/api/reviewer",{tasks:el.dataset.phrev.split(","),reviewer:el.checked?"user":"supervisor"}); toast(el.checked?"You'll review this phase":"Supervisor reviews this phase"); await tick(); return; }
     if(el.id==="openVsc"){ await post("/api/open-vscode",{}); toast("Opened in VS Code"); return; }
     if(el.dataset.reveal){ const r=await post("/api/reveal",{what:el.dataset.reveal,t:S.drawer}); toast("Opened in Finder"); return; }
     if(el.dataset.remove){ e.stopPropagation(); e.preventDefault(); const p=S.projects.find(x=>x.path===el.dataset.remove); if(!p) return;
@@ -1784,6 +1810,7 @@ document.addEventListener("change", async e=>{
   if(e.target.id==="execSel"){ let to=e.target.value; if(to==="human") return;
     if(to==="__person"){ to=(prompt("GitHub username of the teammate:")||"").trim().replace(/^@/,""); if(!to){ delete S.hashes.drawer; renderDrawer(); return; } }
     await post("/api/assign",{t:S.drawer,to}).catch(()=>{}); toast(e.target.value==="__person"?`Assigned to @${to}`:"Executor changed"); delete S.hashes.drawer; await tick(); }
+  if(e.target.id==="revSel"){ await post("/api/reviewer",{tasks:[e.target.dataset.t],reviewer:e.target.value}).catch(()=>{}); toast(e.target.value==="user"?"You'll review this one":"Supervisor reviews this one"); delete S.hashes.drawer; await tick(); return; }
   if(e.target.id==="attSel"){ S.logAttempt=+e.target.value; delete S.hashes.drawer; S._logHtml=""; await renderDrawer(); refreshLog(); }
 });
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeDrawer(); });
