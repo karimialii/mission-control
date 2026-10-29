@@ -78,6 +78,12 @@ class ReviewerTests(unittest.TestCase):
         self.assertIn("Do NOT review", joined)
         self.assertNotIn(f"REVIEW {tid}", joined)
 
+    def test_phase_selection_uses_dependency_levels(self):
+        a = add_task(self.m, status="todo")
+        b = add_task(self.m, status="todo", depends_on=[a])
+        ids = mc.phase_task_ids(self.m, 1)
+        self.assertEqual(ids, [b])
+
 
 class SuggestionTests(unittest.TestCase):
     def setUp(self):

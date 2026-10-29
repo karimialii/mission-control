@@ -1935,6 +1935,7 @@ DASHBOARD_ADDENDUM = """
   4. **executing**: run the supervisor loop. Review reports, answer executor questions (`mc answer`), react to user messages. Keep messages to the user brief, since they see the details in the dashboard. Only ask the user for real decisions.
   5. When every task is done, verify the whole, then write a final summary.
 - **Nobody sees an approval prompt for you.** You run headless: a command outside your allow-list is simply denied. Never tell the user to "approve a prompt" or to run commands for you in their terminal. When you're denied, Mission Control shows the user an Allow / Don't allow card automatically (or you can send one with `mc request-permission`), and you're woken with their answer. Ask for narrow rules (`git fetch *`, not `git *`); say what the command will do, especially anything that publishes (`git push`, `gh pr create`).
+- **The user can review reports themselves.** Tasks may carry `"reviewer": "user"`; their reports show as `FYI … Do NOT review it` in your inbox, so leave them alone. Suggest user review sparingly, only for risk, low confidence, a failed check or an irreversible change, always with a reason: in the plan, add `"review_suggest": "<why>"` to a task; for a finished task, instead of approving it run `mc suggest-review T-00x "<why>"` and end your turn. The user either takes it or hands it back to you.
 - **Permissions belong to the user.** When a report shows a denied command or tool (PERMISSION DENIED in your inbox), do NOT edit `.claude/settings.json` (headless sessions ignore it) and do not try to grant anything yourself. Ask the user: `mc request-permission T-00x '<rule>' '<rule>' --why "<what it is for>"`, preferably with the suggested rules, kept as narrow as possible. Then end your turn. You're woken when they answer; if they allowed it, send the blocked task back with `mc review T-00x changes "permission granted, retry"`.
 - **Limits protect the user's money.** Each task has an attempt limit (3 by default). When it is reached the user is asked and nothing retries it automatically; you cannot start it again yourself. Don't work around it by re-adding the same task. Before the limit, change something with each retry (a sharper brief, a smaller task) instead of sending the same instructions again. Blocked-by-permission tasks are held until the user answers.
 - **Models: cheaper is yours, pricier is the user's.** The user picked the executor model for the mission. For simple tasks you may choose a cheaper one yourself (`"model":"claude-haiku-5-5"` in the plan, or `mc set T-00x model=...`). Anything more expensive is refused unless the user approves it: `mc request-model <model> T-00x [T-00y ...] --why "<why the chosen model isn't enough for this task>"`. Be specific (what failed or what makes it hard), ask for as few tasks as possible, and keep working on other tasks while you wait. Never ask for a stronger model just because a task is long.
@@ -2970,6 +2971,32 @@ def answer_suggestion(m: Mission, tid: str, accept: bool) -> None:
     m.event("task_updated", "user", f"{tid}: {'you took' if accept else 'supervisor keeps'} the review", task=tid)
 
 
+def phase_task_ids(m: Mission, phase: int) -> list:
+    """Ids of the tasks in dependency level `phase` (0-based), as the Timeline groups them."""
+    tasks = m.tasks()
+    levels = phase_levels(tasks)
+    return [t["id"] for t in tasks if levels.get(t["id"]) == phase]
+
+
+def cmd_reviewer(a):
+    m = need_mission()
+    if a.phase is not None:
+        ids = phase_task_ids(m, a.phase - 1)
+        who = a.first
+    else:
+        ids, who = [a.first], a.second
+    if who not in ("user", "supervisor"):
+        die("usage: mc reviewer <T-id> user|supervisor   or   mc reviewer --phase N user|supervisor")
+    done = set_reviewer(m, ids, who, "supervisor")
+    print(f"reviewer = {who} for: {', '.join(done) or 'nothing changed'}")
+
+
+def cmd_suggest_review(a):
+    m = need_mission()
+    suggest_review(m, a.task, " ".join(a.reason))
+    print(f"{a.task}: suggested to the user")
+
+
 def cmd_review(a):
     m = need_mission()
     print(review_task(m, a.task, a.verdict, " ".join(a.message or [])))
@@ -3886,6 +3913,11 @@ def main(argv=None):
     s = sub.add_parser("review", help="supervisor verdict on a task")
     s.add_argument("task"); s.add_argument("verdict", choices=["approve", "changes"]); s.add_argument("message", nargs="*")
     s.set_defaults(fn=cmd_review)
+    s = sub.add_parser("reviewer", help="choose who reviews a task's report: user or supervisor")
+    s.add_argument("first"); s.add_argument("second", nargs="?"); s.add_argument("--phase", type=int)
+    s.set_defaults(fn=cmd_reviewer)
+    s = sub.add_parser("suggest-review", help="supervisor: suggest the user reviews this task's report themselves")
+    s.add_argument("task"); s.add_argument("reason", nargs="+"); s.set_defaults(fn=cmd_suggest_review)
 
     s = sub.add_parser("decide", help="log a decision (kept in STATE.md)"); s.add_argument("text", nargs="+")
     s.set_defaults(fn=cmd_decide)
