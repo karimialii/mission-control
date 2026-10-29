@@ -307,6 +307,14 @@ Set in **Settings → Safety limits**, or `mc.py limits`:
 
 **Blocked by a permission?** The moment a run ends blocked or failed because commands were denied, a permission card appears in Chat (no supervisor tokens used) and the task is held. Press **Allow** and the task retries by itself; press **Don't allow** and the supervisor is told to find another way. Nothing retries into the same wall.
 
+## Reviewing reports yourself
+By default the supervisor reviews every finished task. For the ones you care about, take the review yourself: a task whose reviewer is **Me** goes to `review` without waking the supervisor and is never auto-approved (not even when its `check` passes; the result is still written into the report). It appears under **Needs your review** (Timeline and Board) and in the task drawer, which has **Approve** and **Request changes** (your feedback is required).
+
+- **Per task:** the drawer's *Who reviews the report* select (Supervisor / Me).
+- **Per phase:** the *I'll review this phase* checkbox on each phase in the Timeline. Finished, cancelled and teammate (human) tasks are skipped.
+- **CLI:** `mc reviewer T-001 user|supervisor`, or `mc reviewer --phase N user|supervisor` (N counts from 1). Switching a task that is already in review back to the supervisor wakes it.
+- **Supervisor suggestions:** the supervisor can suggest you review a task (risk, low confidence, a failed check, an irreversible change), always with a reason. In a plan it shows in the approval panel (*I'll review it* / *Keep with supervisor*); for a finished task it shows on the card (*I'll review it* / *You decide*, and declining wakes the supervisor).
+
 ## Where the files are
 Everything Mission Control writes about a project is in the hidden folder `<project>/.mission/`: `reports/T-001.md` (each executor's report), `feedback/`, `runs/` (full session transcripts), `usage.jsonl` (every turn and run), `chat.jsonl`, `STATE.md`. Finder hides folders that start with a dot: use **Open folder** in the toolbar, or **Show in Finder** in a task's report, or press ⇧⌘. in Finder. What the executors actually produce (code, data, documents) is written into the project itself (in git mode, into the task's worktree until it is merged).
 

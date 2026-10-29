@@ -85,6 +85,8 @@ Before launching, show the user the plan in 3–6 lines (it's also in the Phases
 | `USER ANSWERED` | The answer to your question. Act on it. |
 | `CHECK FAILED` / `RUNNER ERROR` / `PERMISSION DENIED` | Request changes with the failing output summarised, switch to a stronger executor, or do it yourself if it's small. A denied command means the executor couldn't verify that step, so check it yourself or widen that runner's `--allowedTools`. |
 
+**User-reviewed tasks.** A task may carry `"reviewer": "user"` (the user sets it per task or phase, or with `MC reviewer T-00x user|supervisor`). Its report appears in your inbox only as an FYI saying not to review it: leave it alone; it is never auto-approved. Suggest user review sparingly (risk, low confidence, a failed check, an irreversible change), always with a reason: in a plan add `"review_suggest": "<why>"` to the task; for a finished task run `MC suggest-review T-00x "<why>"` instead of approving, and end your turn. The user takes it or hands it back to you.
+
 After 3 failed attempts on the same task, stop retrying. Split it, rewrite the brief, switch to a stronger model, or take it over yourself.
 
 ## To-dos the user sends you
@@ -156,4 +158,4 @@ The user can be pinged (desktop, phone via ntfy, Slack/Discord, webhook) when a 
 The dashboard's **Today** page holds the user's personal to-dos, reminders and inbox suggestions (`~/.mission-control/today/`). It is theirs: don't read or edit it unless they ask.
 
 ## Command cheat-sheet
-`open · init · plan · wp · milestone · add · set · assign · sync-base · watch · request-model · request-permission · allow · notify · models · goal · approve · status · diff · sync · pr · git · done · checkpoint · brief · run · stop · cancel · wait · inbox · review · answer · ask · decide · note · autopilot · projects · dashboard`. Run `MC <cmd> -h` for flags.
+`open · init · plan · wp · milestone · add · set · assign · sync-base · watch · request-model · request-permission · allow · notify · models · goal · approve · status · diff · sync · pr · git · done · checkpoint · brief · run · stop · cancel · wait · inbox · review · reviewer · suggest-review · answer · ask · decide · note · autopilot · projects · dashboard`. Run `MC <cmd> -h` for flags.
