@@ -501,6 +501,26 @@ class Handler(BaseHTTPRequestHandler):
                 mc.stop_task(m, tid, "cancelled")
             elif u.path == "/api/resume":
                 m.update_task(tid, lambda t: t.update(paused=False))
+            elif u.path == "/api/review":
+                t = m.task(tid)
+                verdict, msg = body.get("verdict"), str(body.get("message", "")).strip()
+                if verdict not in ("approve", "changes"):
+                    return self._send(400, {"error": "verdict must be approve or changes"})
+                if t["status"] != "review":
+                    return self._send(409, {"error": f"{tid} isn't waiting for review ({t['status']})"})
+                if verdict == "changes" and not msg:
+                    return self._send(400, {"error": "write what should change"})
+                out = mc.review_task(m, tid, verdict, msg, by="user")
+                return self._send(200, {"ok": True, "result": out})
+            elif u.path == "/api/reviewer":
+                ids = [str(x) for x in (body.get("tasks") or []) if TASK_ID.fullmatch(str(x))]
+                try:
+                    changed = mc.set_reviewer(m, ids, str(body.get("reviewer", "")))
+                except ValueError as e:
+                    return self._send(400, {"error": str(e)})
+                return self._send(200, {"ok": True, "changed": changed})
+            elif u.path == "/api/review-suggest":
+                mc.answer_suggestion(m, tid, bool(body.get("accept")))
             elif u.path == "/api/executor":
                 if body["executor"] not in mc.load_runners():
                     return self._send(400, {"error": "unknown executor"})
