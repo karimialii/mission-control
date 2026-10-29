@@ -378,6 +378,9 @@ def new_task(m: Mission, spec: dict, tid: str) -> dict:
         "model": spec.get("model") or "",
         "estimate": int(spec.get("estimate") or 2),
         "check": spec.get("check") or "",
+        "reviewer": "supervisor",
+        **({"review_suggest": {"reason": str(spec["review_suggest"]), "state": "pending", "at": now()}}
+           if isinstance(spec.get("review_suggest"), str) and spec["review_suggest"].strip() else {}),
         "status": "todo",
         "progress": 0,
         "step": "",
@@ -791,6 +794,11 @@ def suggest_permissions(raw: list) -> list:
 
 def is_human(t: dict) -> bool:
     return t.get("executor") == "human"
+
+
+def reviewer_of(t: dict) -> str:
+    """Who reviews this task's report: the user or the supervisor. Teammate (human) tasks keep their PR review."""
+    return "user" if t.get("reviewer") == "user" and not is_human(t) else "supervisor"
 
 
 def build_brief(m: Mission, t: dict, human: bool = False, workdir=None, conflicts=None) -> str:
@@ -1569,7 +1577,7 @@ def finalize(m: Mission, tid: str, attempt: int, rep: dict | None, usage: dict, 
             md += ["**To allow these, ask the user:** `mc request-permission " + tid + " " + " ".join(f"'{x}'" for x in sug)
                    + " --why \"...\"`", ""]
 
-    new_status, step = "review", "awaiting supervisor review"
+    new_status, step = "review", ("awaiting your review" if reviewer_of(t) == "user" else "awaiting supervisor review")
     check_result = None
     if status == "blocked" and rep.get("question"):
         qid = m.next_id("Q", "questions")
@@ -1597,7 +1605,7 @@ def finalize(m: Mission, tid: str, attempt: int, rep: dict | None, usage: dict, 
         md += [f"**Check** `{t['check']}`: {'PASSED' if check_result['ok'] else 'FAILED (exit %s)' % check_result['code']}", ""]
         if not check_result["ok"]:
             md += ["```", check_result["tail"], "```", ""]
-        if check_result["ok"] and not commit_error:
+        if check_result["ok"] and not commit_error and reviewer_of(t) != "user":
             new_status, step = "done", "auto-approved (check passed)"
             if gitops.enabled(m):
                 merged, msg = gitops.integrate(m, tid, t["title"])
@@ -2013,8 +2021,10 @@ def needs_decision(m: Mission, events: list) -> bool:
         if k in ("question", "error", "note", "watch") or (k == "answer" and e.get("actor") == "user") \
                 or (k == "milestone" and e.get("actor") == "system"):
             return True
-        if k == "report" and tasks.get(e.get("task"), {}).get("status") in ("review", "blocked"):
-            return True
+        if k == "report":
+            t = tasks.get(e.get("task")) or {}
+            if t.get("status") == "blocked" or (t.get("status") == "review" and reviewer_of(t) != "user"):
+                return True
     sup = m.meta().get("supervisor") or {}
     if tasks and all(t["status"] in FINAL for t in tasks.values()) and not sup.get("completion_seen"):
         return True  # one final wake to verify the whole and summarise
@@ -2919,6 +2929,47 @@ def review_task(m: Mission, tid: str, verdict: str, msg: str = "", by: str = "su
     return out
 
 
+def set_reviewer(m: Mission, ids: list, reviewer: str, by: str = "user") -> list:
+    """Choose who reviews these tasks' reports. Final and teammate tasks are skipped. Returns the ids that changed."""
+    if reviewer not in ("user", "supervisor"):
+        raise ValueError("reviewer must be 'user' or 'supervisor'")
+    changed = []
+    for tid in ids:
+        t = m.task(tid)
+        if t["status"] in FINAL or is_human(t) or reviewer_of(t) == reviewer:
+            continue
+        m.update_task(tid, lambda x: x.update(reviewer=reviewer))
+        m.event("task_updated", by, f"{tid} will be reviewed by {'you' if reviewer == 'user' else 'the supervisor'}", task=tid)
+        changed.append(tid)
+        if reviewer == "supervisor" and t["status"] == "review":
+            wake_supervisor(m)
+    return changed
+
+
+def suggest_review(m: Mission, tid: str, reason: str) -> None:
+    """Supervisor: ask the user to review this task's report themselves (they accept, or hand it back)."""
+    t = m.task(tid)
+    if t["status"] in FINAL or is_human(t):
+        die(f"{tid} can't be suggested for user review ({t['status']})")
+    m.update_task(tid, lambda x: x.update(review_suggest={"reason": reason, "state": "pending", "at": now()}))
+    m.event("review_suggest", "supervisor", f"{tid}: supervisor suggests you review it: {short(reason, 140)}", task=tid)
+
+
+def answer_suggestion(m: Mission, tid: str, accept: bool) -> None:
+    """User: take the review (accept) or leave it to the supervisor (decline, which wakes it if the task is waiting)."""
+    t = m.task(tid)
+    sug = dict(t.get("review_suggest") or {})
+    if not sug:
+        return
+    sug["state"] = "accepted" if accept else "declined"
+    m.update_task(tid, lambda x: x.update(review_suggest=sug))
+    if accept:
+        set_reviewer(m, [tid], "user")
+    elif t["status"] == "review":
+        wake_supervisor(m)
+    m.event("task_updated", "user", f"{tid}: {'you took' if accept else 'supervisor keeps'} the review", task=tid)
+
+
 def cmd_review(a):
     m = need_mission()
     print(review_task(m, a.task, a.verdict, " ".join(a.message or [])))
@@ -3295,6 +3346,9 @@ def inbox_items(m: Mission, mark_read: bool) -> list:
                          "and propose what comes next (a plan with a new \"milestone\", or `mc wp close` if the work package is done).")
     for t in m.tasks():
         if t["status"] == "review":
+            if reviewer_of(t) == "user":
+                items.append(f"FYI {t['id']} ({t['title']}) is waiting for the USER's review (reviewer: user). Do NOT review it; they approve or request changes themselves.")
+                continue
             last = (t.get("attempts") or [{}])[-1]
             flag = " CHECK FAILED" if (last.get("check") or {}).get("ok") is False else ""
             flag += " RUNNER ERROR" if last.get("error") else ""
