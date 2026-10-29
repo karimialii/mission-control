@@ -174,6 +174,8 @@ def summary(path: str, info: dict) -> dict:
         for k in tok:
             tok[k] += t.get("tokens", {}).get(k, 0) or 0
     user_q = sum(1 for q in m.questions() if q.get("to") == "user" and q.get("status") == "open")
+    user_q += sum(1 for t in tasks if t["status"] == "review"
+                  and (mc.reviewer_of(t) == "user" or (t.get("review_suggest") or {}).get("state") == "pending"))
     updated = max([t.get("updated", "") for t in tasks] + [meta.get("created", "")])
     sup = meta.get("supervisor") or {}
     return {"path": path, "initialized": True, "phase": meta.get("phase", "executing"),
@@ -506,6 +508,8 @@ class Handler(BaseHTTPRequestHandler):
                 verdict, msg = body.get("verdict"), str(body.get("message", "")).strip()
                 if verdict not in ("approve", "changes"):
                     return self._send(400, {"error": "verdict must be approve or changes"})
+                if mc.is_human(t):
+                    return self._send(409, {"error": f"{tid} is a teammate's task; its review happens on the pull request"})
                 if t["status"] != "review":
                     return self._send(409, {"error": f"{tid} isn't waiting for review ({t['status']})"})
                 if verdict == "changes" and not msg:
@@ -513,7 +517,12 @@ class Handler(BaseHTTPRequestHandler):
                 out = mc.review_task(m, tid, verdict, msg, by="user")
                 return self._send(200, {"ok": True, "result": out})
             elif u.path == "/api/reviewer":
-                ids = [str(x) for x in (body.get("tasks") or []) if TASK_ID.fullmatch(str(x))]
+                raw = [str(x) for x in (body.get("tasks") or [])]
+                ids = [x for x in raw if TASK_ID.fullmatch(x)]
+                known = {t["id"] for t in m.tasks()}
+                unknown = [x for x in raw if x not in known]
+                if unknown:
+                    return self._send(400, {"error": "unknown task(s): " + ", ".join(unknown)})
                 try:
                     changed = mc.set_reviewer(m, ids, str(body.get("reviewer", "")))
                 except ValueError as e:

@@ -313,6 +313,7 @@ By default the supervisor reviews every finished task. For the ones you care abo
 - **Per task:** the drawer's *Who reviews the report* select (Supervisor / Me).
 - **Per phase:** the *I'll review this phase* checkbox on each phase in the Timeline. Finished, cancelled and teammate (human) tasks are skipped.
 - **CLI:** `mc reviewer T-001 user|supervisor`, or `mc reviewer --phase N user|supervisor` (N counts from 1). Switching a task that is already in review back to the supervisor wakes it.
+- **Waiting on you:** tasks waiting for your review (and pending supervisor suggestions) are counted in *waiting on you* and notified like decisions. With Autopilot off, a verdict doesn't relaunch the task or start its dependents; you press Run.
 - **Supervisor suggestions:** the supervisor can suggest you review a task (risk, low confidence, a failed check, an irreversible change), always with a reason. In a plan it shows in the approval panel (*I'll review it* / *Keep with supervisor*); for a finished task it shows on the card (*I'll review it* / *You decide*, and declining wakes the supervisor).
 
 ## Where the files are

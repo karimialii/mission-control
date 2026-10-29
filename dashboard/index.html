@@ -943,7 +943,7 @@ function viewBoard(){
       const waiting=deps(t), ready=st.ready.includes(t.id);
       return `<div class="card ${t.status}" data-task="${t.id}">
         <div class="id">${t.id}${t.paused?' <span class="muted">· paused</span>':""}</div><h4>${esc(t.title)}</h4>
-        <div class="meta">${execTag(t)}${isUserRev(t)?'<span class="tag" style="color:var(--purple)">you review</span>':""}<span class="tag">⏱ ${t.estimate}</span>${(t.tokens?.cost_usd)?`<span class="tag">${money(t.tokens.cost_usd)}</span>`:""}${t.attempts?.length>1?(()=>{ const cap=(st.mission.max_attempts||3)+(t.attempt_bonus||0), n=t.attempts.length; return `<span class="tag" style="${n>=cap?"color:var(--orange)":""}">try ${n}/${cap}</span>`; })():""}</div>
+        <div class="meta">${execTag(t)}${isUserRev(t)&&!["done","cancelled"].includes(t.status)?'<span class="tag" style="color:var(--purple)">you review</span>':""}<span class="tag">⏱ ${t.estimate}</span>${(t.tokens?.cost_usd)?`<span class="tag">${money(t.tokens.cost_usd)}</span>`:""}${t.attempts?.length>1?(()=>{ const cap=(st.mission.max_attempts||3)+(t.attempt_bonus||0), n=t.attempts.length; return `<span class="tag" style="${n>=cap?"color:var(--orange)":""}">try ${n}/${cap}</span>`; })():""}</div>
         ${t.status==="running"?(t.executor==="human"?`<div class="step">${esc(t.step||"")}</div>`:`<div class="step">› ${esc(t.step||"…")}</div><div class="bar"><i style="width:${t.progress||0}%"></i></div>`):""}
         ${t.status==="blocked"||t.status==="review"?`<div class="step">› ${esc(t.step||"")}</div>`:""}
         ${waiting.length&&s!=="done"?`<div class="step">⧗ waits for ${waiting.join(", ")}</div>`:""}
@@ -1666,7 +1666,7 @@ document.addEventListener("click", async e=>{
       catch(err){ return; }
       delete S.hashes.drawer; await tick(); return; }
     if(el.dataset.rsug){ await post("/api/review-suggest",{t:el.dataset.t,accept:el.dataset.rsug==="accept"}); toast(el.dataset.rsug==="accept"?"You'll review it":"Supervisor will decide"); delete S.hashes.drawer; await tick(); return; }
-    if(el.dataset.phrev){ await post("/api/reviewer",{tasks:el.dataset.phrev.split(","),reviewer:el.checked?"user":"supervisor"}); toast(el.checked?"You'll review this phase":"Supervisor reviews this phase"); await tick(); return; }
+    if(el.dataset.phrev){ try{ await post("/api/reviewer",{tasks:el.dataset.phrev.split(","),reviewer:el.checked?"user":"supervisor"}); toast(el.checked?"You'll review this phase":"Supervisor reviews this phase"); }catch(err){} finally{ delete S.hashes.main; await tick(); } return; }
     if(el.id==="openVsc"){ await post("/api/open-vscode",{}); toast("Opened in VS Code"); return; }
     if(el.dataset.reveal){ const r=await post("/api/reveal",{what:el.dataset.reveal,t:S.drawer}); toast("Opened in Finder"); return; }
     if(el.dataset.remove){ e.stopPropagation(); e.preventDefault(); const p=S.projects.find(x=>x.path===el.dataset.remove); if(!p) return;
@@ -1810,7 +1810,7 @@ document.addEventListener("change", async e=>{
   if(e.target.id==="execSel"){ let to=e.target.value; if(to==="human") return;
     if(to==="__person"){ to=(prompt("GitHub username of the teammate:")||"").trim().replace(/^@/,""); if(!to){ delete S.hashes.drawer; renderDrawer(); return; } }
     await post("/api/assign",{t:S.drawer,to}).catch(()=>{}); toast(e.target.value==="__person"?`Assigned to @${to}`:"Executor changed"); delete S.hashes.drawer; await tick(); }
-  if(e.target.id==="revSel"){ await post("/api/reviewer",{tasks:[e.target.dataset.t],reviewer:e.target.value}).catch(()=>{}); toast(e.target.value==="user"?"You'll review this one":"Supervisor reviews this one"); delete S.hashes.drawer; await tick(); return; }
+  if(e.target.id==="revSel"){ try{ await post("/api/reviewer",{tasks:[e.target.dataset.t],reviewer:e.target.value}); toast(e.target.value==="user"?"You'll review this one":"Supervisor reviews this one"); }catch(err){} finally{ delete S.hashes.drawer; await tick(); } return; }
   if(e.target.id==="attSel"){ S.logAttempt=+e.target.value; delete S.hashes.drawer; S._logHtml=""; await renderDrawer(); refreshLog(); }
 });
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeDrawer(); });

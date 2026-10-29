@@ -113,10 +113,19 @@ def masked(cfg: dict | None = None) -> dict:
 
 
 # ---- classifying events
-def classify(ev: dict) -> str | None:
+def classify(ev: dict, m=None) -> str | None:
     kind = ev.get("kind")
     if kind == "question" and ev.get("to") == "user":
         return "decision"
+    if kind == "review_suggest":
+        return "decision"
+    if kind == "report" and m is not None and ev.get("task"):
+        try:  # a report that now waits for the user's own review
+            t = m.task(ev["task"])
+            if t.get("status") == "review" and t.get("reviewer") == "user" and t.get("executor") != "human":
+                return "decision"
+        except BaseException:
+            pass
     if kind == "error" or (kind == "check" and ev.get("ok") is False):
         return "failure"
     if kind == "watch":
@@ -172,7 +181,7 @@ def on_event(m, ev: dict) -> None:
         cfg = load()
         if not cfg["enabled"]:
             return
-        kind = classify(ev)
+        kind = classify(ev, m)
         if kind is None and ev.get("kind") in ("approved", "report", "task_updated") and _all_done(m) and _mark_complete(m):
             kind = "complete"
             ev = {**ev, "msg": f"All {len(m.tasks())} tasks are done. Time to verify and open the pull request."}

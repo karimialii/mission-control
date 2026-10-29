@@ -1912,8 +1912,11 @@ def state_text(m: Mission) -> str:
         lines += ["", "## Open questions"]
         lines += [f"- {q['id']} ({q['from']} → {q['to']}): {q['question']}" for q in open_q]
     ready = [t["id"] for t in ready_tasks(m, tasks)]
-    review = [t["id"] for t in tasks if t["status"] == "review"]
+    review = [t["id"] for t in tasks if t["status"] == "review" and reviewer_of(t) != "user"]
+    user_review = [t["id"] for t in tasks if t["status"] == "review" and reviewer_of(t) == "user"]
     lines += ["", "## Next", f"- Ready to run: {', '.join(ready) or 'none'}", f"- Awaiting your review: {', '.join(review) or 'none'}"]
+    if user_review:
+        lines.append(f"- Awaiting the USER's review (not yours, do not review): {', '.join(user_review)}")
     return "\n".join(lines) + "\n"
 
 
@@ -2650,6 +2653,9 @@ def cmd_set(a):
     def f(t):
         for kv in a.pairs:
             k, _, v = kv.partition("=")
+            if k in ("reviewer", "review_suggest") and os.environ.get("MC_ROLE") == "supervisor":
+                print(f"note: ignored {k}: only the user chooses who reviews. Use `mc suggest-review` to ask.", file=sys.stderr)
+                continue
             if k in ("model", "executor"):
                 ok_, why = check_model_choice(m, v if k == "executor" else t.get("executor"), v if k == "model" else t.get("model"))
                 if not ok_:
@@ -2930,6 +2936,14 @@ def review_task(m: Mission, tid: str, verdict: str, msg: str = "", by: str = "su
     return out
 
 
+def handback_to_supervisor(m: Mission, tid: str, by: str) -> None:
+    """A waiting report goes back to the supervisor. The note is what makes needs_decision() true, so the loop
+    doesn't stop at once when its cursor is already past the task's report event."""
+    if by != "supervisor":
+        m.event("note", "user", f"{tid}: the user handed this review back to you. Review it now.", task=tid)
+    wake_supervisor(m)
+
+
 def set_reviewer(m: Mission, ids: list, reviewer: str, by: str = "user") -> list:
     """Choose who reviews these tasks' reports. Final and teammate tasks are skipped. Returns the ids that changed."""
     if reviewer not in ("user", "supervisor"):
@@ -2943,7 +2957,7 @@ def set_reviewer(m: Mission, ids: list, reviewer: str, by: str = "user") -> list
         m.event("task_updated", by, f"{tid} will be reviewed by {'you' if reviewer == 'user' else 'the supervisor'}", task=tid)
         changed.append(tid)
         if reviewer == "supervisor" and t["status"] == "review":
-            wake_supervisor(m)
+            handback_to_supervisor(m, tid, by)
     return changed
 
 
@@ -2967,7 +2981,7 @@ def answer_suggestion(m: Mission, tid: str, accept: bool) -> None:
     if accept:
         set_reviewer(m, [tid], "user")
     elif t["status"] == "review":
-        wake_supervisor(m)
+        handback_to_supervisor(m, tid, "user")
     m.event("task_updated", "user", f"{tid}: {'you took' if accept else 'supervisor keeps'} the review", task=tid)
 
 
@@ -2980,14 +2994,18 @@ def phase_task_ids(m: Mission, phase: int) -> list:
 
 def cmd_reviewer(a):
     m = need_mission()
+    if os.environ.get("MC_ROLE") == "supervisor":
+        die("the user chooses who reviews a task. To ask them to take one, use: mc suggest-review <T-id> <reason>")
     if a.phase is not None:
         ids = phase_task_ids(m, a.phase - 1)
+        if not ids:
+            die(f"no tasks in phase {a.phase}")
         who = a.first
     else:
         ids, who = [a.first], a.second
     if who not in ("user", "supervisor"):
         die("usage: mc reviewer <T-id> user|supervisor   or   mc reviewer --phase N user|supervisor")
-    done = set_reviewer(m, ids, who, "supervisor")
+    done = set_reviewer(m, ids, who, os.environ.get("MC_ROLE") or "user")
     print(f"reviewer = {who} for: {', '.join(done) or 'nothing changed'}")
 
 
@@ -2999,6 +3017,8 @@ def cmd_suggest_review(a):
 
 def cmd_review(a):
     m = need_mission()
+    if os.environ.get("MC_ROLE") == "supervisor" and reviewer_of(m.task(a.task)) == "user":
+        die(f"{a.task} is the user's to review; they approve it or request changes themselves. Leave it and end your turn.")
     print(review_task(m, a.task, a.verdict, " ".join(a.message or [])))
 
 
@@ -3375,6 +3395,9 @@ def inbox_items(m: Mission, mark_read: bool) -> list:
         if t["status"] == "review":
             if reviewer_of(t) == "user":
                 items.append(f"FYI {t['id']} ({t['title']}) is waiting for the USER's review (reviewer: user). Do NOT review it; they approve or request changes themselves.")
+                continue
+            if (t.get("review_suggest") or {}).get("state") == "pending":
+                items.append(f"FYI {t['id']} ({t['title']}) was suggested to the user, waiting for their answer; don't review it yet.")
                 continue
             last = (t.get("attempts") or [{}])[-1]
             flag = " CHECK FAILED" if (last.get("check") or {}).get("ok") is False else ""
